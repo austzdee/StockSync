@@ -19,6 +19,11 @@ namespace StockSync.Data
                 .HasIndex(p => p.Sku)
                 .IsUnique();
 
+
+            modelBuilder.Entity<Product>()
+                .Property(p => p.Price)
+                .HasColumnType("decimal(18,2)");
+
             modelBuilder.Entity<Stock>()
                 .HasKey(s => new { s.ProductId, s.WarehouseId });
 
