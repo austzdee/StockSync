@@ -17,14 +17,53 @@ public class ProductsController : ControllerBase
         _context = context;
     }
 
+    // Get products with optional filters and pagination
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<Product>>> GetAll()
+    public async Task<IActionResult> GetAll(
+        [FromQuery] string? category,
+        [FromQuery] bool lowStock = false,
+        [FromQuery] int limit = 10,
+        [FromQuery] int offset = 0)
     {
-        var products = await _context.Products
+        // Reject invalid pagination values
+        if (limit <= 0 || offset < 0)
+            return UnprocessableEntity(new { message = "Limit must be greater than 0 and offset cannot be negative." });
+
+        var query = _context.Products
             .Where(p => !p.IsDeleted)
+            .AsQueryable();
+
+        // Filter by category if provided
+        if (!string.IsNullOrWhiteSpace(category))
+        {
+            query = query.Where(p => p.Category == category);
+        }
+
+        var products = query
+            .Select(p => new
+            {
+                p.Id,
+                p.Name,
+                p.Sku,
+                p.Price,
+                p.Category,
+                p.IsDeleted,
+                TotalAvailable = p.Stocks.Sum(s => s.QuantityAvailable),
+                TotalReserved = p.Stocks.Sum(s => s.QuantityReserved)
+            });
+
+        // Filter products with total available stock less than 10
+        if (lowStock)
+        {
+            products = products.Where(p => p.TotalAvailable < 10);
+        }
+
+        var result = await products
+            .Skip(offset)
+            .Take(limit)
             .ToListAsync();
 
-        return Ok(products);
+        return Ok(result);
     }
 
     [HttpGet("{id}")]
