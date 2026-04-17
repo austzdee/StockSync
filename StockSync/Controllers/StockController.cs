@@ -152,6 +152,80 @@ public class StockController : ControllerBase
         });
     }
 
+    // Transfer stock from one warehouse to another
+    [HttpPost("transfer")]
+    public async Task<IActionResult> TransferStock(TransferStockDto dto)
+    {
+        // Reject invalid quantity
+        if (dto.Quantity <= 0)
+            return UnprocessableEntity(new { message = "Quantity must be greater than zero." });
+
+        // Prevent same warehouse transfer
+        if (dto.FromWarehouseId == dto.ToWarehouseId)
+            return UnprocessableEntity(new { message = "Source and destination warehouses must be different." });
+
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+
+        try
+        {
+            // Find source stock
+            var sourceStock = await _context.Stocks
+                .FirstOrDefaultAsync(s =>
+                    s.ProductId == dto.ProductId &&
+                    s.WarehouseId == dto.FromWarehouseId);
+
+            if (sourceStock is null)
+                return NotFound(new { message = "Source stock record not found." });
+
+            // Check available stock
+            if (sourceStock.QuantityAvailable < dto.Quantity)
+                return Conflict(new { message = "Not enough available stock in source warehouse." });
+
+            // Find destination stock
+            var destinationStock = await _context.Stocks
+                .FirstOrDefaultAsync(s =>
+                    s.ProductId == dto.ProductId &&
+                    s.WarehouseId == dto.ToWarehouseId);
+
+            // Create destination stock row if it does not exist
+            if (destinationStock is null)
+            {
+                destinationStock = new Stock
+                {
+                    ProductId = dto.ProductId,
+                    WarehouseId = dto.ToWarehouseId,
+                    QuantityAvailable = 0,
+                    QuantityReserved = 0
+                };
+
+                _context.Stocks.Add(destinationStock);
+            }
+
+            // Move stock
+            sourceStock.QuantityAvailable -= dto.Quantity;
+            destinationStock.QuantityAvailable += dto.Quantity;
+
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            return Ok(new
+            {
+                message = "Stock transferred successfully.",
+                productId = dto.ProductId,
+                fromWarehouseId = dto.FromWarehouseId,
+                toWarehouseId = dto.ToWarehouseId,
+                quantityTransferred = dto.Quantity,
+                sourceQuantityAvailable = sourceStock.QuantityAvailable,
+                destinationQuantityAvailable = destinationStock.QuantityAvailable
+            });
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
+    }
+
     // Get all stock records
     [HttpGet]
     public async Task<IActionResult> GetAll()
