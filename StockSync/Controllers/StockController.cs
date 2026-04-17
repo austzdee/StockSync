@@ -115,6 +115,43 @@ public class StockController : ControllerBase
         });
     }
 
+    // Release reserved stock back to available stock
+    [HttpPost("release")]
+    public async Task<IActionResult> ReleaseStock(ReleaseStockDto dto)
+    {
+        // Reject invalid quantity
+        if (dto.Quantity <= 0)
+            return UnprocessableEntity(new { message = "Quantity must be greater than zero." });
+
+        // Find stock record
+        var stock = await _context.Stocks
+            .FirstOrDefaultAsync(s =>
+                s.ProductId == dto.ProductId &&
+                s.WarehouseId == dto.WarehouseId);
+
+        if (stock is null)
+            return NotFound(new { message = "Stock record not found." });
+
+        // Prevent releasing more than reserved
+        if (stock.QuantityReserved < dto.Quantity)
+            return Conflict(new { message = "Not enough reserved stock to release." });
+
+        // Move quantity from reserved back to available
+        stock.QuantityReserved -= dto.Quantity;
+        stock.QuantityAvailable += dto.Quantity;
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new
+        {
+            message = "Reserved stock released successfully.",
+            stock.ProductId,
+            stock.WarehouseId,
+            stock.QuantityAvailable,
+            stock.QuantityReserved
+        });
+    }
+
     // Get all stock records
     [HttpGet]
     public async Task<IActionResult> GetAll()
