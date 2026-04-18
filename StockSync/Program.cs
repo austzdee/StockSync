@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using StockSync.Data;
 using StockSync.Middleware;
+using StockSync.Interfaces;
+using StockSync.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,6 +13,7 @@ builder.Services.AddOpenApi();
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+builder.Services.AddScoped<IStockService, StockService>();
 
 var app = builder.Build();
 

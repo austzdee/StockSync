@@ -18,19 +18,23 @@ public class WarehousesController : ControllerBase
         _context = context;
     }
 
-    // Get all warehouses
+    // Get all active warehouses
     [HttpGet]
     public async Task<ActionResult<IEnumerable<Warehouse>>> GetAll()
     {
-        var warehouses = await _context.Warehouses.ToListAsync();
+        var warehouses = await _context.Warehouses
+            .Where(w => !w.IsDeleted)
+            .ToListAsync();
+
         return Ok(warehouses);
     }
 
-    // Get one warehouse by id
+    // Get one active warehouse by id
     [HttpGet("{id}")]
     public async Task<ActionResult<Warehouse>> GetById(int id)
     {
-        var warehouse = await _context.Warehouses.FindAsync(id);
+        var warehouse = await _context.Warehouses
+            .FirstOrDefaultAsync(w => w.Id == id && !w.IsDeleted);
 
         if (warehouse is null)
             return NotFound(new { message = "Warehouse not found." });
@@ -61,11 +65,12 @@ public class WarehousesController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = warehouse.Id }, warehouse);
     }
 
-    // Update an existing warehouse
+    // Update an existing active warehouse
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(int id, UpdateWarehouseDto dto)
     {
-        var warehouse = await _context.Warehouses.FindAsync(id);
+        var warehouse = await _context.Warehouses
+            .FirstOrDefaultAsync(w => w.Id == id && !w.IsDeleted);
 
         if (warehouse is null)
             return NotFound(new { message = "Warehouse not found." });
@@ -85,16 +90,17 @@ public class WarehousesController : ControllerBase
         return Ok(warehouse);
     }
 
-    // Delete a warehouse
+    // Soft delete a warehouse
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {
-        var warehouse = await _context.Warehouses.FindAsync(id);
+        var warehouse = await _context.Warehouses
+            .FirstOrDefaultAsync(w => w.Id == id && !w.IsDeleted);
 
         if (warehouse is null)
             return NotFound(new { message = "Warehouse not found." });
 
-        _context.Warehouses.Remove(warehouse);
+        warehouse.IsDeleted = true;
         await _context.SaveChangesAsync();
 
         return NoContent();
