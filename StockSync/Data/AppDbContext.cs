@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using StockSync.Entities;
 
+
 namespace StockSync.Data
 {
     public class AppDbContext: DbContext
@@ -12,6 +13,7 @@ namespace StockSync.Data
         public DbSet<Product> Products => Set<Product>();
         public DbSet<Warehouse> Warehouses => Set<Warehouse>();
         public DbSet<Stock> Stocks => Set<Stock>();
+        public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -40,6 +42,14 @@ namespace StockSync.Data
                 .HasOne(s => s.Warehouse)
                 .WithMany(w => w.Stocks)
                 .HasForeignKey(s => s.WarehouseId);
+
+            modelBuilder.Entity<AuditLog>()
+                .Property(a => a.Action)
+                .HasMaxLength(50);
+
+            modelBuilder.Entity<AuditLog>()
+                .Property(a => a.PerformedBy)
+                .HasMaxLength(100);
         }
     }
 }

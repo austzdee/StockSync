@@ -4,6 +4,7 @@ using StockSync.Data;
 using StockSync.DTOs;
 using StockSync.Entities;
 
+
 namespace StockSync.Controllers;
 
 [ApiController]
@@ -66,6 +67,15 @@ public class StockController : ControllerBase
             stock.QuantityReserved = dto.QuantityReserved;
         }
 
+        _context.AuditLogs.Add(new AuditLog
+        {
+            ProductId = stock.ProductId,
+            WarehouseId = stock.WarehouseId,
+            Action = "ASSIGN",
+            QuantityChanged = stock.QuantityAvailable + stock.QuantityReserved,
+            PerformedBy = "system"
+        });
+
         await _context.SaveChangesAsync();
 
         return Ok(new
@@ -103,6 +113,15 @@ public class StockController : ControllerBase
         stock.QuantityAvailable -= dto.Quantity;
         stock.QuantityReserved += dto.Quantity;
 
+        _context.AuditLogs.Add(new AuditLog
+        {
+            ProductId = stock.ProductId,
+            WarehouseId = stock.WarehouseId,
+            Action = "RESERVE",
+            QuantityChanged = dto.Quantity,
+            PerformedBy = "system"
+        });
+
         await _context.SaveChangesAsync();
 
         return Ok(new
@@ -139,6 +158,15 @@ public class StockController : ControllerBase
         // Move quantity from reserved back to available
         stock.QuantityReserved -= dto.Quantity;
         stock.QuantityAvailable += dto.Quantity;
+
+        _context.AuditLogs.Add(new AuditLog
+        {
+            ProductId = stock.ProductId,
+            WarehouseId = stock.WarehouseId,
+            Action = "RELEASE",
+            QuantityChanged = dto.Quantity,
+            PerformedBy = "system"
+        });
 
         await _context.SaveChangesAsync();
 
@@ -205,6 +233,25 @@ public class StockController : ControllerBase
             sourceStock.QuantityAvailable -= dto.Quantity;
             destinationStock.QuantityAvailable += dto.Quantity;
 
+            _context.AuditLogs.AddRange(
+              new AuditLog
+             {
+                 ProductId = dto.ProductId,
+                 WarehouseId = dto.FromWarehouseId,
+                 Action = "TRANSFER_OUT",
+                 QuantityChanged = -dto.Quantity,
+                 PerformedBy = "system"
+              },
+              new AuditLog
+             {
+                 ProductId = dto.ProductId,
+                  WarehouseId = dto.ToWarehouseId,
+                 Action = "TRANSFER_IN",
+                 QuantityChanged = dto.Quantity,
+                 PerformedBy = "system"
+               }
+            );
+
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
 
@@ -224,6 +271,17 @@ public class StockController : ControllerBase
             await transaction.RollbackAsync();
             throw;
         }
+    }
+
+    // Get audit log history
+    [HttpGet("audit-logs")]
+    public async Task<IActionResult> GetAuditLogs()
+    {
+        var logs = await _context.AuditLogs
+            .OrderByDescending(a => a.CreatedAtUtc)
+            .ToListAsync();
+
+        return Ok(logs);
     }
 
     // Get all stock records
