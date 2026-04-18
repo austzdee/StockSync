@@ -278,10 +278,12 @@ public class StockController : ControllerBase
     public async Task<IActionResult> GetAuditLogs()
     {
         var logs = await _context.AuditLogs
-            .OrderByDescending(a => a.CreatedAtUtc)
-            .ToListAsync();
+     .OrderByDescending(a => a.CreatedAtUtc)
+     .ToListAsync();
 
         return Ok(logs);
+
+
     }
 
     // Get all stock records
