@@ -2,8 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using StockSync.Data;
 using StockSync.DTOs;
-using StockSync.Entities;
-
+using StockSync.Interfaces;
 
 namespace StockSync.Controllers;
 
@@ -12,264 +11,88 @@ namespace StockSync.Controllers;
 public class StockController : ControllerBase
 {
     private readonly AppDbContext _context;
+    private readonly IStockService _stockService;
 
-    // Inject database context
-    public StockController(AppDbContext context)
+    // Inject database context and stock service
+    public StockController(AppDbContext context, IStockService stockService)
     {
         _context = context;
+        _stockService = stockService;
     }
 
     // Create or update stock for a product in a warehouse
     [HttpPost("assign")]
     public async Task<IActionResult> AssignStock(AssignStockDto dto)
     {
-        // Reject invalid quantities
-        if (dto.QuantityAvailable < 0 || dto.QuantityReserved < 0)
-            return UnprocessableEntity(new { message = "Stock values cannot be negative." });
-
-        // Check that product exists
-        var productExists = await _context.Products
-            .AnyAsync(p => p.Id == dto.ProductId && !p.IsDeleted);
-
-        if (!productExists)
-            return NotFound(new { message = "Product not found." });
-
-        // Check that warehouse exists
-        var warehouseExists = await _context.Warehouses
-        .AnyAsync(w => w.Id == dto.WarehouseId && !w.IsDeleted);
-
-        if (!warehouseExists)
-            return NotFound(new { message = "Warehouse not found." });
-
-        // Check whether stock row already exists
-        var stock = await _context.Stocks
-            .FirstOrDefaultAsync(s =>
-                s.ProductId == dto.ProductId &&
-                s.WarehouseId == dto.WarehouseId);
-
-        if (stock is null)
+        try
         {
-            // Create new stock record
-            stock = new Stock
-            {
-                ProductId = dto.ProductId,
-                WarehouseId = dto.WarehouseId,
-                QuantityAvailable = dto.QuantityAvailable,
-                QuantityReserved = dto.QuantityReserved
-            };
-
-            _context.Stocks.Add(stock);
+            var result = await _stockService.AssignStockAsync(dto);
+            return Ok(result);
         }
-        else
+        catch (KeyNotFoundException ex)
         {
-            // Update existing stock record
-            stock.QuantityAvailable = dto.QuantityAvailable;
-            stock.QuantityReserved = dto.QuantityReserved;
+            return NotFound(new { message = ex.Message });
         }
-
-        _context.AuditLogs.Add(new AuditLog
+        catch (InvalidOperationException ex)
         {
-            ProductId = stock.ProductId,
-            WarehouseId = stock.WarehouseId,
-            Action = "ASSIGN",
-            QuantityChanged = stock.QuantityAvailable + stock.QuantityReserved,
-            PerformedBy = "system"
-        });
-
-        await _context.SaveChangesAsync();
-
-        return Ok(new
-        {
-            message = "Stock assigned successfully.",
-            stock.ProductId,
-            stock.WarehouseId,
-            stock.QuantityAvailable,
-            stock.QuantityReserved
-        });
+            return UnprocessableEntity(new { message = ex.Message });
+        }
     }
 
     // Reserve stock for a product in a warehouse
     [HttpPost("reserve")]
     public async Task<IActionResult> ReserveStock(ReserveStockDto dto)
     {
-        // Reject invalid quantity
-        if (dto.Quantity <= 0)
-            return UnprocessableEntity(new { message = "Quantity must be greater than zero." });
-
-        // Find stock record
-        var stock = await _context.Stocks
-            .FirstOrDefaultAsync(s =>
-                s.ProductId == dto.ProductId &&
-                s.WarehouseId == dto.WarehouseId);
-
-        if (stock is null)
-            return NotFound(new { message = "Stock record not found." });
-
-        // Prevent over-reservation
-        if (stock.QuantityAvailable < dto.Quantity)
-            return Conflict(new { message = "Not enough available stock to reserve." });
-
-        // Move quantity from available to reserved
-        stock.QuantityAvailable -= dto.Quantity;
-        stock.QuantityReserved += dto.Quantity;
-
-        _context.AuditLogs.Add(new AuditLog
+        try
         {
-            ProductId = stock.ProductId,
-            WarehouseId = stock.WarehouseId,
-            Action = "RESERVE",
-            QuantityChanged = dto.Quantity,
-            PerformedBy = "system"
-        });
-
-        await _context.SaveChangesAsync();
-
-        return Ok(new
+            var result = await _stockService.ReserveStockAsync(dto);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
         {
-            message = "Stock reserved successfully.",
-            stock.ProductId,
-            stock.WarehouseId,
-            stock.QuantityAvailable,
-            stock.QuantityReserved
-        });
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
     }
 
     // Release reserved stock back to available stock
     [HttpPost("release")]
     public async Task<IActionResult> ReleaseStock(ReleaseStockDto dto)
     {
-        // Reject invalid quantity
-        if (dto.Quantity <= 0)
-            return UnprocessableEntity(new { message = "Quantity must be greater than zero." });
-
-        // Find stock record
-        var stock = await _context.Stocks
-            .FirstOrDefaultAsync(s =>
-                s.ProductId == dto.ProductId &&
-                s.WarehouseId == dto.WarehouseId);
-
-        if (stock is null)
-            return NotFound(new { message = "Stock record not found." });
-
-        // Prevent releasing more than reserved
-        if (stock.QuantityReserved < dto.Quantity)
-            return Conflict(new { message = "Not enough reserved stock to release." });
-
-        // Move quantity from reserved back to available
-        stock.QuantityReserved -= dto.Quantity;
-        stock.QuantityAvailable += dto.Quantity;
-
-        _context.AuditLogs.Add(new AuditLog
+        try
         {
-            ProductId = stock.ProductId,
-            WarehouseId = stock.WarehouseId,
-            Action = "RELEASE",
-            QuantityChanged = dto.Quantity,
-            PerformedBy = "system"
-        });
-
-        await _context.SaveChangesAsync();
-
-        return Ok(new
+            var result = await _stockService.ReleaseStockAsync(dto);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
         {
-            message = "Reserved stock released successfully.",
-            stock.ProductId,
-            stock.WarehouseId,
-            stock.QuantityAvailable,
-            stock.QuantityReserved
-        });
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
     }
 
     // Transfer stock from one warehouse to another
     [HttpPost("transfer")]
     public async Task<IActionResult> TransferStock(TransferStockDto dto)
     {
-        // Reject invalid quantity
-        if (dto.Quantity <= 0)
-            return UnprocessableEntity(new { message = "Quantity must be greater than zero." });
-
-        // Prevent same warehouse transfer
-        if (dto.FromWarehouseId == dto.ToWarehouseId)
-            return UnprocessableEntity(new { message = "Source and destination warehouses must be different." });
-
-        await using var transaction = await _context.Database.BeginTransactionAsync();
-
         try
         {
-            // Find source stock
-            var sourceStock = await _context.Stocks
-                .FirstOrDefaultAsync(s =>
-                    s.ProductId == dto.ProductId &&
-                    s.WarehouseId == dto.FromWarehouseId);
-
-            if (sourceStock is null)
-                return NotFound(new { message = "Source stock record not found." });
-
-            // Check available stock
-            if (sourceStock.QuantityAvailable < dto.Quantity)
-                return Conflict(new { message = "Not enough available stock in source warehouse." });
-
-            // Find destination stock
-            var destinationStock = await _context.Stocks
-                .FirstOrDefaultAsync(s =>
-                    s.ProductId == dto.ProductId &&
-                    s.WarehouseId == dto.ToWarehouseId);
-
-            // Create destination stock row if it does not exist
-            if (destinationStock is null)
-            {
-                destinationStock = new Stock
-                {
-                    ProductId = dto.ProductId,
-                    WarehouseId = dto.ToWarehouseId,
-                    QuantityAvailable = 0,
-                    QuantityReserved = 0
-                };
-
-                _context.Stocks.Add(destinationStock);
-            }
-
-            // Move stock
-            sourceStock.QuantityAvailable -= dto.Quantity;
-            destinationStock.QuantityAvailable += dto.Quantity;
-
-            _context.AuditLogs.AddRange(
-              new AuditLog
-             {
-                 ProductId = dto.ProductId,
-                 WarehouseId = dto.FromWarehouseId,
-                 Action = "TRANSFER_OUT",
-                 QuantityChanged = -dto.Quantity,
-                 PerformedBy = "system"
-              },
-              new AuditLog
-             {
-                 ProductId = dto.ProductId,
-                  WarehouseId = dto.ToWarehouseId,
-                 Action = "TRANSFER_IN",
-                 QuantityChanged = dto.Quantity,
-                 PerformedBy = "system"
-               }
-            );
-
-            await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
-
-            return Ok(new
-            {
-                message = "Stock transferred successfully.",
-                productId = dto.ProductId,
-                fromWarehouseId = dto.FromWarehouseId,
-                toWarehouseId = dto.ToWarehouseId,
-                quantityTransferred = dto.Quantity,
-                sourceQuantityAvailable = sourceStock.QuantityAvailable,
-                destinationQuantityAvailable = destinationStock.QuantityAvailable
-            });
+            var result = await _stockService.TransferStockAsync(dto);
+            return Ok(result);
         }
-        catch
+        catch (KeyNotFoundException ex)
         {
-            await transaction.RollbackAsync();
-            throw;
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
         }
     }
 
@@ -278,12 +101,10 @@ public class StockController : ControllerBase
     public async Task<IActionResult> GetAuditLogs()
     {
         var logs = await _context.AuditLogs
-     .OrderByDescending(a => a.CreatedAtUtc)
-     .ToListAsync();
+            .OrderByDescending(a => a.CreatedAtUtc)
+            .ToListAsync();
 
         return Ok(logs);
-
-
     }
 
     // Get all stock records
