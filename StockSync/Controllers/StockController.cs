@@ -132,24 +132,56 @@ public class StockController : ControllerBase
         return Ok(lowStockItems);
     }
 
-    // Get all stock records
+    // Get all stock records with optional category filter and pagination
     [HttpGet]
-    public async Task<IActionResult> GetAll()
+    public async Task<IActionResult> GetAll(
+        [FromQuery] string? category,
+        [FromQuery] int limit = 10,
+        [FromQuery] int offset = 0)
     {
-        var stocks = await _context.Stocks
+        if (limit <= 0)
+            return BadRequest(new { message = "Limit must be greater than zero." });
+
+        if (offset < 0)
+            return BadRequest(new { message = "Offset cannot be negative." });
+
+        var query = _context.Stocks
             .Include(s => s.Product)
             .Include(s => s.Warehouse)
+            .Where(s => !s.Product.IsDeleted && !s.Warehouse.IsDeleted)
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(category))
+        {
+            query = query.Where(s => s.Product.Category == category);
+        }
+
+        var totalCount = await query.CountAsync();
+
+        var stocks = await query
+            .OrderBy(s => s.Product.Name)
+            .Skip(offset)
+            .Take(limit)
             .Select(s => new
             {
                 s.ProductId,
                 ProductName = s.Product.Name,
+                s.Product.Sku,
+                s.Product.Category,
                 s.WarehouseId,
                 WarehouseName = s.Warehouse.LocationName,
                 s.QuantityAvailable,
-                s.QuantityReserved
+                s.QuantityReserved,
+                TotalQuantity = s.QuantityAvailable + s.QuantityReserved
             })
             .ToListAsync();
 
-        return Ok(stocks);
+        return Ok(new
+        {
+            totalCount,
+            limit,
+            offset,
+            results = stocks
+        });
     }
 }
