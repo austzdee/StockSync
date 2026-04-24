@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 
 namespace StockSync.Middleware;
 
@@ -25,6 +26,24 @@ public class ExceptionMiddleware
             // Continue request pipeline
             await _next(context);
         }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            // Log concurrency conflict
+            _logger.LogWarning(ex, "Concurrency conflict occurred.");
+
+            // Return clean JSON conflict response
+            context.Response.ContentType = "application/json";
+            context.Response.StatusCode = (int)HttpStatusCode.Conflict;
+
+            var response = new
+            {
+                message = "The stock record was modified by another request. Please try again.",
+                statusCode = 409
+            };
+
+            var json = JsonSerializer.Serialize(response);
+            await context.Response.WriteAsync(json);
+        }
         catch (Exception ex)
         {
             // Log unexpected error
@@ -40,10 +59,7 @@ public class ExceptionMiddleware
                 statusCode = 500
             };
 
-            // Convert object to JSON
             var json = JsonSerializer.Serialize(response);
-
-            // Write JSON to response body
             await context.Response.WriteAsync(json);
         }
     }

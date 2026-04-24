@@ -1,3 +1,4 @@
 <Solution>
+  <Project Path="StockSync.Tests/StockSync.Tests.csproj" />
   <Project Path="StockSync/StockSync.csproj" />
 </Solution>

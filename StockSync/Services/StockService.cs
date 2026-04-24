@@ -20,7 +20,7 @@ public class StockService : IStockService
     public async Task<object> AssignStockAsync(AssignStockDto dto)
     {
         // Reject negative stock values
-        if (dto.QuantityAvailable < 0 || dto.QuantityReserved < 0)
+        if (dto.QuantityAvailable < 0 )
             throw new InvalidOperationException("Stock values cannot be negative.");
 
         // Confirm product exists and is active
@@ -51,16 +51,15 @@ public class StockService : IStockService
                 ProductId = dto.ProductId,
                 WarehouseId = dto.WarehouseId,
                 QuantityAvailable = dto.QuantityAvailable,
-                QuantityReserved = dto.QuantityReserved
+                QuantityReserved = 0
             };
 
             _context.Stocks.Add(stock);
         }
         else
         {
-            // Update the existing stock row
-            stock.QuantityAvailable = dto.QuantityAvailable;
-            stock.QuantityReserved = dto.QuantityReserved;
+            // Update only available stock
+            stock.QuantityAvailable += dto.QuantityAvailable;
         }
 
         // Record stock assignment in audit log
@@ -190,6 +189,20 @@ public class StockService : IStockService
         // Prevent transfer to the same warehouse
         if (dto.FromWarehouseId == dto.ToWarehouseId)
             throw new InvalidOperationException("Source and destination warehouses must be different.");
+
+        // Confirm source warehouse exists and is active
+        var sourceWarehouseExists = await _context.Warehouses
+            .AnyAsync(w => w.Id == dto.FromWarehouseId && !w.IsDeleted);
+
+        if (!sourceWarehouseExists)
+            throw new KeyNotFoundException("Source warehouse not found.");
+
+        // Confirm destination warehouse exists and is active
+        var destinationWarehouseExists = await _context.Warehouses
+            .AnyAsync(w => w.Id == dto.ToWarehouseId && !w.IsDeleted);
+
+        if (!destinationWarehouseExists)
+            throw new KeyNotFoundException("Destination warehouse not found.");
 
         // Start database transaction for atomic transfer
         await using var transaction = await _context.Database.BeginTransactionAsync();
