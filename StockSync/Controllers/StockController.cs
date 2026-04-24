@@ -107,6 +107,31 @@ public class StockController : ControllerBase
         return Ok(logs);
     }
 
+    // Get low stock records where total stock is less than 10
+    [HttpGet("low-stock")]
+    public async Task<IActionResult> GetLowStock()
+    {
+        var lowStockItems = await _context.Stocks
+            .Include(s => s.Product)
+            .Include(s => s.Warehouse)
+            .Where(s => s.QuantityAvailable + s.QuantityReserved < 10)
+            .Select(s => new
+            {
+                s.ProductId,
+                ProductName = s.Product.Name,
+                s.Product.Sku,
+                s.Product.Category,
+                s.WarehouseId,
+                WarehouseName = s.Warehouse.LocationName,
+                s.QuantityAvailable,
+                s.QuantityReserved,
+                TotalQuantity = s.QuantityAvailable + s.QuantityReserved
+            })
+            .ToListAsync();
+
+        return Ok(lowStockItems);
+    }
+
     // Get all stock records
     [HttpGet]
     public async Task<IActionResult> GetAll()
