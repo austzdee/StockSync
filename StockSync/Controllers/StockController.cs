@@ -3,9 +3,11 @@ using Microsoft.EntityFrameworkCore;
 using StockSync.Data;
 using StockSync.DTOs;
 using StockSync.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 
 namespace StockSync.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class StockController : ControllerBase

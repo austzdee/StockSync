@@ -14,6 +14,7 @@ namespace StockSync.Data
         public DbSet<Warehouse> Warehouses => Set<Warehouse>();
         public DbSet<Stock> Stocks => Set<Stock>();
         public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+        public DbSet<AppUser> AppUsers => Set<AppUser>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
