@@ -116,6 +116,23 @@ public class AuthController : ControllerBase
         });
     }
 
+    [HttpPost("logout")]
+    public async Task<IActionResult> Logout(RefreshTokenDto dto)
+    {
+        var user = await _context.AppUsers
+            .FirstOrDefaultAsync(u => u.RefreshToken == dto.RefreshToken);
+
+        if (user is null)
+            return Unauthorized(new { message = "Invalid refresh token." });
+
+        user.RefreshToken = null;
+        user.RefreshTokenExpiresAtUtc = null;
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new { message = "Logout successful." });
+    }
+
     private string GenerateJwtToken(AppUser user)
     {
         var jwtKey = _configuration["Jwt:Key"]!;
