@@ -91,6 +91,31 @@ public class AuthController : ControllerBase
         });
     }
 
+    [HttpPost("refresh")]
+    public async Task<IActionResult> RefreshToken(RefreshTokenDto dto)
+    {
+        var user = await _context.AppUsers
+            .FirstOrDefaultAsync(u => u.RefreshToken == dto.RefreshToken);
+
+        if (user is null || user.RefreshTokenExpiresAtUtc < DateTime.UtcNow)
+            return Unauthorized(new { message = "Invalid or expired refresh token." });
+
+        var token = GenerateJwtToken(user);
+        var refreshToken = GenerateRefreshToken();
+
+        user.RefreshToken = refreshToken;
+        user.RefreshTokenExpiresAtUtc = DateTime.UtcNow.AddDays(7);
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new
+        {
+            message = "Token refreshed successfully.",
+            token,
+            refreshToken
+        });
+    }
+
     private string GenerateJwtToken(AppUser user)
     {
         var jwtKey = _configuration["Jwt:Key"]!;
