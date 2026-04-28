@@ -1,6 +1,11 @@
-﻿using System.Net;
+﻿using System.IdentityModel.Tokens.Jwt;
+using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Security.Claims;
+using System.Text;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.IdentityModel.Tokens;
 using Xunit;
 
 namespace StockSync.Tests;
@@ -18,6 +23,11 @@ public class StockTransferTests : IClassFixture<WebApplicationFactory<Program>>
     public async Task TransferStock_ShouldMoveQuantityBetweenWarehouses()
     {
         var client = _factory.CreateClient();
+
+        var token = GenerateAdminToken();
+
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", token);
 
         var warehouse1Response = await client.PostAsJsonAsync("/api/warehouses", new
         {
@@ -38,6 +48,15 @@ public class StockTransferTests : IClassFixture<WebApplicationFactory<Program>>
             price = 10.00,
             category = "Test"
         });
+
+        if (productResponse.StatusCode != HttpStatusCode.Created)
+        {
+            var errorBody = await productResponse.Content.ReadAsStringAsync();
+            var authHeader = productResponse.Headers.WwwAuthenticate.ToString();
+
+            throw new Exception($"Product create failed. Status: {productResponse.StatusCode}. AuthHeader: {authHeader}. Body: {errorBody}");
+        }
+        Assert.Equal(HttpStatusCode.Created, productResponse.StatusCode);
 
         var sourceWarehouse = await warehouse1Response.Content.ReadFromJsonAsync<WarehouseResponse>();
         var destinationWarehouse = await warehouse2Response.Content.ReadFromJsonAsync<WarehouseResponse>();
@@ -63,6 +82,32 @@ public class StockTransferTests : IClassFixture<WebApplicationFactory<Program>>
         });
 
         Assert.Equal(HttpStatusCode.OK, transferResponse.StatusCode);
+    }
+
+    private static string GenerateAdminToken()
+    {
+        var key = "THIS_IS_A_DEVELOPMENT_SECRET_KEY_CHANGE_LATER_123456789";
+
+        var claims = new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, "999"),
+            new Claim(ClaimTypes.Name, "Test Admin"),
+            new Claim(ClaimTypes.Email, "admin@test.com"),
+            new Claim(ClaimTypes.Role, "Admin")
+        };
+
+        var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
+        var credentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
+
+        var token = new JwtSecurityToken(
+            issuer: "StockSyncApi",
+            audience: "StockSyncUsers",
+            claims: claims,
+            expires: DateTime.UtcNow.AddMinutes(60),
+            signingCredentials: credentials
+        );
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
     private class WarehouseResponse { public int id { get; set; } }
