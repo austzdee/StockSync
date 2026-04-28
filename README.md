@@ -2,39 +2,15 @@
 
 # 
 
-# StockSync is a backend warehouse inventory management API built with ASP.NET Core and Entity Framework Core. It manages products, warehouses, stock levels, reservations, and transfers across multiple locations with audit logging and automated tests.
+# !\[CI](https://github.com/austzdee/StockSync/actions/workflows/dotnet.yml/badge.svg)
 
 # 
 
-# \---
+# StockSync is a modern inventory and warehouse stock management API built with ASP.NET Core and Entity Framework Core.
 
 # 
 
-# \## Overview
-
-# 
-
-# This project was designed to simulate real-world inventory workflows used in retail, logistics, eCommerce, and warehouse operations.
-
-# 
-
-# StockSync focuses on:
-
-# 
-
-# \- Accurate stock control
-
-# \- Multi-warehouse inventory tracking
-
-# \- Reservation workflows (cart/order holding)
-
-# \- Atomic stock transfers
-
-# \- Low stock monitoring
-
-# \- Search, filtering, and pagination
-
-# \- Audit history for stock movements
+# It demonstrates production-focused backend engineering practices including authentication, authorization, stock transfers, audit logging, automated testing, and CI/CD pipelines.
 
 # 
 
@@ -46,77 +22,31 @@
 
 # 
 
-# \### Product Management
+# \- JWT Authentication
 
-# 
+# \- Refresh Token Rotation
 
-# \- Create products
+# \- Logout / Token Revocation
 
-# \- Update products
+# \- Role-Based Authorization (Admin/User)
 
-# \- Soft delete products
+# \- Product Management
 
-# \- SKU uniqueness validation
+# \- Warehouse Management
 
-# 
+# \- Stock Assignment
 
-# \### Warehouse Management
+# \- Stock Transfers Between Warehouses
 
-# 
+# \- Audit Logging
 
-# \- Create warehouses
+# \- Soft Delete Support
 
-# \- Update warehouses
+# \- Pagination \& Filtering
 
-# \- Soft delete warehouses
+# \- Integration Testing
 
-# 
-
-# \### Inventory Operations
-
-# 
-
-# \- Assign stock to a warehouse
-
-# \- Reserve stock
-
-# \- Release reserved stock
-
-# \- Transfer stock between warehouses
-
-# 
-
-# \### Reporting
-
-# 
-
-# \- Low stock alerts (`total quantity < 10`)
-
-# \- Category filtering
-
-# \- Pagination support
-
-# 
-
-# \### Reliability
-
-# 
-
-# \- SQL transactions for transfers
-
-# \- Validation rules
-
-# \- Conflict handling
-
-# \- Audit logs
-
-# 
-
-# \### Testing
-
-# 
-
-# \- xUnit integration tests
+# \- GitHub Actions CI Pipeline
 
 # 
 
@@ -128,17 +58,17 @@
 
 # 
 
-# \- ASP.NET Core Web API
-
-# \- C#
+# \- ASP.NET Core (.NET 10)
 
 # \- Entity Framework Core
 
 # \- SQL Server / LocalDB
 
-# \- Swagger / OpenAPI
+# \- JWT Bearer Authentication
 
-# \- xUnit
+# \- xUnit Integration Testing
+
+# \- GitHub Actions
 
 # 
 
@@ -146,15 +76,87 @@
 
 # 
 
-# \## API Examples
+# \## Example API Endpoints
 
 # 
 
-# \### Get paginated stock
+# \### Auth
 
 # 
 
-# ```http
+# \- `POST /api/Auth/register`
 
-# GET /api/Stock?limit=10\&offset=0
+# \- `POST /api/Auth/login`
+
+# \- `POST /api/Auth/refresh`
+
+# \- `POST /api/Auth/logout`
+
+# 
+
+# \### Products
+
+# 
+
+# \- `GET /api/Products`
+
+# \- `POST /api/Products` \*(Admin only)\*
+
+# \- `PUT /api/Products/{id}`
+
+# \- `DELETE /api/Products/{id}`
+
+# 
+
+# \### Stock
+
+# 
+
+# \- `POST /api/stock/assign`
+
+# \- `POST /api/stock/transfer`
+
+# 
+
+# \---
+
+# 
+
+# \## Quality Checks
+
+# 
+
+# Automated GitHub Actions workflow runs on every push:
+
+# 
+
+# \- Restore packages
+
+# \- Build solution
+
+# \- Apply database migrations
+
+# \- Run integration tests
+
+# 
+
+# \---
+
+# 
+
+# \## Local Setup
+
+# 
+
+# ```bash
+
+# git clone https://github.com/austzdee/StockSync.git
+
+# cd StockSync
+
+# dotnet restore
+
+# dotnet ef database update
+
+# dotnet run
 
