@@ -52,7 +52,41 @@
 
 # \---
 
-# 
+\## Screenshots
+
+
+
+\### Swagger API
+
+
+
+!\[Swagger](assets/swagger-home.png)
+
+
+
+\### Authentication
+
+
+
+!\[Auth Login](assets/auth-login.png)
+
+
+
+\### Stock Transfer
+
+
+
+!\[Transfer](assets/stock-transfer.png)
+
+
+
+\### CI Pipeline
+
+
+
+!\[GitHub Actions](assets/github-actions-pass.png)
+
+# \---
 
 # \## Tech Stack
 
