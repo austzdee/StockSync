@@ -25,5 +25,11 @@ jobs:
     - name: Build solution
       run: dotnet build --no-restore --configuration Release
 
+    - name: Install EF Core tool
+      run: dotnet tool install --global dotnet-ef
+
+    - name: Apply database migrations
+      run: dotnet ef database update --project StockSync/StockSync.csproj --startup-project StockSync/StockSync.csproj
+
     - name: Run tests
       run: dotnet test --no-build --configuration Release
