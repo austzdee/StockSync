@@ -1,15 +1,27 @@
 const Sidebar = () => {
   return (
     <aside className="w-64 bg-slate-950 border-r border-slate-800">
-      <div className="p-6">
-        <h1 className="text-2xl font-bold text-white">
-          Stock<span className="text-cyan-400">Sync</span>
-        </h1>
+      <div className="border-b border-slate-800 p-6">
+  <div className="flex items-center gap-3">
+    {/* Placeholder logo icon */}
+    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-amber-600 via-stone-500 to-cyan-400 font-bold text-white shadow-lg">
+      S
+    </div>
 
-        <p className="mt-1 text-xs text-slate-400">
-          Inventory Management
-        </p>
-      </div>
+    <div>
+      <h1 className="text-xl font-bold">
+        <span className="text-stone-300">Stock</span>
+        <span className="bg-gradient-to-r from-amber-500 to-cyan-400 bg-clip-text text-transparent">
+          Sync
+        </span>
+      </h1>
+
+      <p className="text-xs text-slate-500">
+        Inventory Management
+      </p>
+    </div>
+  </div>
+</div>
 
       <nav className="px-4">
         <ul className="space-y-2">

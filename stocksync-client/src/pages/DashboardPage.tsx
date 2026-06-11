@@ -5,13 +5,16 @@ const DashboardPage = () => {
   return (
     <DashboardLayout>
       <div>
-        <h1 className="text-3xl font-bold text-white">
-          StockSync Dashboard
+        <h1 className="text-3xl font-bold tracking-tight">
+          <span className="text-stone-300">Stock</span>
+          <span className="bg-gradient-to-r from-amber-500 via-orange-400 to-cyan-400 bg-clip-text text-transparent">
+            Sync
+          </span>
+
+          <span className="ml-2 text-white">Dashboard</span>
         </h1>
 
-        <p className="mt-2 text-slate-400">
-          Inventory Management Platform
-        </p>
+        <p className="mt-2 text-slate-400">Inventory Management Platform</p>
 
         <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
           <DashboardCard
