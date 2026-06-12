@@ -11,10 +11,10 @@ const DashboardPage = () => {
             Sync
           </span>
 
-          <span className="ml-2 text-white">Dashboard</span>
+          <span className="ml-3 text-white">Dashboard</span>
         </h1>
 
-        <p className="mt-2 text-slate-400">Inventory Management Platform</p>
+        <p className="mt-3 text-slate-400">Inventory Management Platform</p>
 
         <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
           <DashboardCard
