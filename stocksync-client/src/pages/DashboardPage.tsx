@@ -1,7 +1,24 @@
+import { useEffect, useState } from "react";
 import DashboardCard from "../components/DashboardCard";
 import DashboardLayout from "../layouts/DashboardLayout";
+import { getProducts, type Product } from "../services/productService";
 
 const DashboardPage = () => {
+  const [products, setProducts] = useState<Product[]>([]);
+
+  useEffect(() => {
+    const loadProducts = async () => {
+      try {
+        const data = await getProducts();
+        setProducts(data);
+      } catch (error) {
+        console.error("Failed to load products", error);
+      }
+    };
+
+    loadProducts();
+  }, []);
+
   return (
     <DashboardLayout>
       <div>
@@ -19,7 +36,7 @@ const DashboardPage = () => {
         <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
           <DashboardCard
             title="Total Products"
-            value={0}
+            value={products.length}
             description="Products currently tracked"
           />
 

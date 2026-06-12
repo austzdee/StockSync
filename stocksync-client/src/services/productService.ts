@@ -1,11 +1,17 @@
 import { api } from "./api";
-import type { Product } from "../types/product";
+
+export interface Product {
+  id: number;
+  name: string;
+  sku: string;
+  category: string;
+  price: number;
+}
 
 /**
- * Retrieves all products from the API.
+ * Retrieves all products.
  */
 export const getProducts = async (): Promise<Product[]> => {
-  const response = await api.get<Product[]>("/products");
-
+  const response = await api.get("/Products");
   return response.data;
 };
