@@ -1,14 +1,22 @@
 import type { ReactNode } from "react";
+import { Navigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 
 interface ProtectedRouteProps {
   children: ReactNode;
 }
 
 /**
- * Temporary protected route wrapper.
- * Authentication logic will be added after AuthContext is created.
+ * Restricts access to authenticated users only.
+ * Unauthenticated users are redirected to the login page.
  */
 const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
+  const { isAuthenticated } = useAuth();
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
   return <>{children}</>;
 };
 
