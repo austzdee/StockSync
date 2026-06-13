@@ -8,7 +8,16 @@ using StockSync.Services;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
-
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowReactFrontend", policy =>
+    {
+        policy
+            .WithOrigins("http://localhost:5173")
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -48,9 +57,11 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+// Disabled for local React + HTTP API development.
+// app.UseHttpsRedirection();
 
-app.UseHttpsRedirection();
 
+app.UseCors("AllowReactFrontend");
 app.UseAuthentication();
 app.UseAuthorization();
 
