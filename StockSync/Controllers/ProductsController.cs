@@ -68,6 +68,7 @@ public class ProductsController : ControllerBase
     }
 
     [HttpGet("{id}")]
+    [Authorize]
     public async Task<ActionResult<Product>> GetById(int id)
     {
         var product = await _context.Products
@@ -113,7 +114,7 @@ public class ProductsController : ControllerBase
     }
 
     [HttpPut("{id}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize]
     public async Task<IActionResult> Update(int id, UpdateProductDto dto)
     {
         var product = await _context.Products
@@ -149,7 +150,7 @@ public class ProductsController : ControllerBase
     }
 
     [HttpDelete("{id}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize]
     public async Task<IActionResult> Delete(int id)
     {
         var product = await _context.Products
