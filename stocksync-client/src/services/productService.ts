@@ -9,9 +9,13 @@ export interface Product {
 }
 
 /**
- * Retrieves all products.
+ * Retrieves products from the backend API.
+ * The query parameters align with the ASP.NET Core Products endpoint.
  */
 export const getProducts = async (): Promise<Product[]> => {
-  const response = await api.get("/Products");
+  const response = await api.get<Product[]>(
+    "/Products?lowStock=false&limit=100&offset=0"
+  );
+
   return response.data;
 };
