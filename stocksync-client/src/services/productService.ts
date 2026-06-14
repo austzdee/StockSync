@@ -39,3 +39,15 @@ export const createProduct = async (
 
   return response.data;
 };
+
+/**
+ * Updates an existing product record.
+ */
+export const updateProduct = async (
+  id: number,
+  product: CreateProductRequest
+): Promise<Product> => {
+  const response = await api.put<Product>(`/Products/${id}`, product);
+
+  return response.data;
+};

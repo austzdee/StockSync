@@ -15,4 +15,3 @@ const StockTransfersPage = () => {
 };
 
 export default StockTransfersPage;
-    

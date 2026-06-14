@@ -3,11 +3,14 @@ import DashboardLayout from "../layouts/DashboardLayout";
 import {
   createProduct,
   getProducts,
+  updateProduct,
   type CreateProductRequest,
   type Product,
 } from "../services/productService";
 
 const ProductsPage = () => {
+  // State to track which product is currently being edited (if any).
+  const [editingProductId, setEditingProductId] = useState<number | null>(null);
   // Product data fetched from the API and displayed in the table.
   const [products, setProducts] = useState<Product[]>([]);
 
@@ -39,13 +42,24 @@ const ProductsPage = () => {
     }
   };
 
+  const handleEditClick = (product: Product) => {
+    setFormData({
+      name: product.name,
+      sku: product.sku,
+      category: product.category,
+      price: product.price,
+    });
+
+    setEditingProductId(product.id);
+  };
+
   // Fetch products once when the page mounts.
   useEffect(() => {
     loadProducts();
   }, []);
 
   /**
-   * Creates a new product, then refreshes the table.
+   * Creates a new product or updates an existing product, then refreshes the table.
    */
   const handleCreateProduct = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -53,7 +67,12 @@ const ProductsPage = () => {
     setIsSubmitting(true);
 
     try {
-      await createProduct(formData);
+      if (editingProductId) {
+        await updateProduct(editingProductId, formData);
+      } else {
+        await createProduct(formData);
+      }
+
       await loadProducts();
 
       setFormData({
@@ -62,8 +81,10 @@ const ProductsPage = () => {
         category: "",
         price: 0,
       });
+
+      setEditingProductId(null);
     } catch (error) {
-      console.error("Failed to create product", error);
+      console.error("Failed to save product", error);
     } finally {
       setIsSubmitting(false);
     }
@@ -135,7 +156,13 @@ const ProductsPage = () => {
             disabled={isSubmitting}
             className="rounded-lg bg-cyan-500 px-4 py-3 font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60 md:col-span-4"
           >
-            {isSubmitting ? "Creating Product..." : "Add Product"}
+            {isSubmitting
+              ? editingProductId
+                ? "Updating Product..."
+                : "Creating Product..."
+              : editingProductId
+                ? "Update Product"
+                : "Add Product"}
           </button>
         </form>
 
@@ -157,6 +184,7 @@ const ProductsPage = () => {
                   <th className="px-6 py-3">SKU</th>
                   <th className="px-6 py-3">Category</th>
                   <th className="px-6 py-3">Price</th>
+                  <th className="px-6 py-3">Actions</th>
                 </tr>
               </thead>
 
@@ -170,6 +198,15 @@ const ProductsPage = () => {
                     </td>
                     <td className="px-6 py-4 text-slate-300">
                       £{product.price.toFixed(2)}
+                    </td>
+                    <td className="px-6 py-4">
+                      <button
+                        type="button"
+                        onClick={() => handleEditClick(product)}
+                        className="rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-slate-950 transition hover:bg-amber-400"
+                      >
+                        Edit
+                      </button>
                     </td>
                   </tr>
                 ))}

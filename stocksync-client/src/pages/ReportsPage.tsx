@@ -1,5 +1,6 @@
 import DashboardLayout from "../layouts/DashboardLayout";
 
+
 const ReportsPage = () => {
   return (
     <DashboardLayout>
