@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import DashboardLayout from "../layouts/DashboardLayout";
 import {
   createWarehouse,
+  deleteWarehouse,
   getWarehouses,
   updateWarehouse,
   type CreateWarehouseRequest,
@@ -11,6 +12,9 @@ import {
 const WarehousesPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingWarehouseId, setEditingWarehouseId] = useState<number | null>(
+    null
+  );
+  const [deletingWarehouseId, setDeletingWarehouseId] = useState<number | null>(
     null
   );
 
@@ -46,6 +50,26 @@ const WarehousesPage = () => {
     });
 
     setEditingWarehouseId(warehouse.id);
+  };
+
+  /**
+   * Deletes a warehouse after user confirmation, then refreshes the table.
+   */
+  const handleDeleteWarehouse = async (warehouseId: number) => {
+    if (!window.confirm("Delete this warehouse?")) {
+      return;
+    }
+
+    setDeletingWarehouseId(warehouseId);
+
+    try {
+      await deleteWarehouse(warehouseId);
+      await loadWarehouses();
+    } catch (error) {
+      console.error("Failed to delete warehouse", error);
+    } finally {
+      setDeletingWarehouseId(null);
+    }
   };
 
   /**
@@ -166,13 +190,24 @@ const WarehousesPage = () => {
                       {warehouse.address}
                     </td>
 
-                    <td className="px-6 py-4">
+                    <td className="flex gap-2 px-6 py-4">
                       <button
                         type="button"
                         onClick={() => handleEditWarehouse(warehouse)}
                         className="rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-slate-950"
                       >
                         Edit
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteWarehouse(warehouse.id)}
+                        disabled={deletingWarehouseId === warehouse.id}
+                        className="rounded-lg bg-rose-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-400 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {deletingWarehouseId === warehouse.id
+                          ? "Deleting..."
+                          : "Delete"}
                       </button>
                     </td>
                   </tr>

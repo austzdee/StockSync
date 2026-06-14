@@ -2,21 +2,28 @@ import { useEffect, useState } from "react";
 import DashboardCard from "../components/DashboardCard";
 import DashboardLayout from "../layouts/DashboardLayout";
 import { getProducts, type Product } from "../services/productService";
+import { getWarehouses, type Warehouse } from "../services/warehouseService";
 
 const DashboardPage = () => {
   const [products, setProducts] = useState<Product[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
 
   useEffect(() => {
-    const loadProducts = async () => {
+    const loadDashboardData = async () => {
       try {
-        const data = await getProducts();
-        setProducts(data);
+        const [productData, warehouseData] = await Promise.all([
+          getProducts(),
+          getWarehouses(),
+        ]);
+
+        setProducts(productData);
+        setWarehouses(warehouseData);
       } catch (error) {
-        console.error("Failed to load products", error);
+        console.error("Failed to load dashboard data", error);
       }
     };
 
-    loadProducts();
+    loadDashboardData();
   }, []);
 
   return (
@@ -42,7 +49,7 @@ const DashboardPage = () => {
 
           <DashboardCard
             title="Warehouses"
-            value={0}
+            value={warehouses.length}
             description="Active storage locations"
             tone="success"
           />
