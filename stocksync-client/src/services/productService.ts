@@ -9,13 +9,33 @@ export interface Product {
 }
 
 /**
+ * Request payload used when creating a new product.
+ */
+export interface CreateProductRequest {
+  name: string;
+  sku: string;
+  category: string;
+  price: number;
+}
+
+/**
  * Retrieves products from the backend API.
- * The query parameters align with the ASP.NET Core Products endpoint.
  */
 export const getProducts = async (): Promise<Product[]> => {
   const response = await api.get<Product[]>(
     "/Products?lowStock=false&limit=100&offset=0"
   );
+
+  return response.data;
+};
+
+/**
+ * Creates a new product record.
+ */
+export const createProduct = async (
+  product: CreateProductRequest
+): Promise<Product> => {
+  const response = await api.post<Product>("/Products", product);
 
   return response.data;
 };

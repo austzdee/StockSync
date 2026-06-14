@@ -3,6 +3,9 @@ import DashboardPage from "./pages/DashboardPage";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import LoginPage from "./pages/LoginPage";
 import ProductsPage from "./pages/ProductsPage";
+import WarehousesPage from "./pages/WarehousesPage";
+import StockTransfersPage from "./pages/StockTransfersPage";
+import ReportsPage from "./pages/ReportsPage";
 
 function App() {
   return (
@@ -31,6 +34,32 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/warehouses"
+          element={
+            <ProtectedRoute>
+              <WarehousesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/stock-transfers"
+          element={
+            <ProtectedRoute>
+              <StockTransfersPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reports"
+          element={
+            <ProtectedRoute>
+              <ReportsPage />
+            </ProtectedRoute>
+          }
+        />
+        {/* Catch-all route for undefined paths */}
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </BrowserRouter>
   );

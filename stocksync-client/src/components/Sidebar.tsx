@@ -21,36 +21,72 @@ const Sidebar = () => {
       <nav className="px-4 py-4">
         <ul className="space-y-2">
           <li>
-            <button className="w-full rounded-lg px-4 py-3 text-left text-slate-300 hover:bg-slate-800">
+            <NavLink
+              to="/dashboard"
+              className={({ isActive }) =>
+                `block w-full rounded-lg px-4 py-3 text-left ${
+                  isActive
+                    ? "bg-slate-800 text-white"
+                    : "text-slate-300 hover:bg-slate-800"
+                }`
+              }
+            >
               Dashboard
-            </button>
+            </NavLink>
           </li>
 
           <li>
             <NavLink
               to="/products"
-              className="block w-full rounded-lg px-4 py-3 text-slate-300 hover:bg-slate-800"
+              className={({ isActive }) =>
+                `block w-full rounded-lg px-4 py-3 text-left ${
+                  isActive
+                    ? "bg-slate-800 text-white"
+                    : "text-slate-300 hover:bg-slate-800"
+                }`
+              }
             >
               Products
             </NavLink>
           </li>
 
           <li>
-            <button className="w-full rounded-lg px-4 py-3 text-left text-slate-300 hover:bg-slate-800">
+            <NavLink
+              to="/warehouses"
+              className={({ isActive }) =>
+                `block w-full rounded-lg px-4 py-3 text-left ${
+                  isActive ? "bg-slate-800 text-white" : "text-slate-300 hover:bg-slate-800"
+                }`
+              }
+            >
               Warehouses
-            </button>
+            </NavLink>
           </li>
 
           <li>
-            <button className="w-full rounded-lg px-4 py-3 text-left text-slate-300 hover:bg-slate-800">
+            <NavLink
+              to="/transfers"
+              className={({ isActive }) =>
+                `block w-full rounded-lg px-4 py-3 text-left ${
+                  isActive ? "bg-slate-800 text-white" : "text-slate-300 hover:bg-slate-800"
+                }`
+              }
+            >
               Stock Transfers
-            </button>
+            </NavLink>
           </li>
 
           <li>
-            <button className="w-full rounded-lg px-4 py-3 text-left text-slate-300 hover:bg-slate-800">
+            <NavLink
+              to="/reports"
+              className={({ isActive }) =>
+                `block w-full rounded-lg px-4 py-3 text-left ${
+                  isActive ? "bg-slate-800 text-white" : "text-slate-300 hover:bg-slate-800"
+                }`
+              }
+            >
               Reports
-            </button>
+            </NavLink>
           </li>
         </ul>
       </nav>
