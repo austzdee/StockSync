@@ -3,20 +3,28 @@ import DashboardLayout from "../layouts/DashboardLayout";
 import {
   createWarehouse,
   getWarehouses,
+  updateWarehouse,
   type CreateWarehouseRequest,
   type Warehouse,
 } from "../services/warehouseService";
 
 const WarehousesPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingWarehouseId, setEditingWarehouseId] = useState<number | null>(
+    null
+  );
 
   const [formData, setFormData] = useState<CreateWarehouseRequest>({
     locationName: "",
     address: "",
   });
+
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  /**
+   * Loads warehouse records from the backend API.
+   */
   const loadWarehouses = async () => {
     try {
       const data = await getWarehouses();
@@ -28,21 +36,43 @@ const WarehousesPage = () => {
     }
   };
 
-  const handleCreateWarehouse = async (event: React.FormEvent) => {
+  /**
+   * Loads the selected warehouse into the form for editing.
+   */
+  const handleEditWarehouse = (warehouse: Warehouse) => {
+    setFormData({
+      locationName: warehouse.locationName,
+      address: warehouse.address,
+    });
+
+    setEditingWarehouseId(warehouse.id);
+  };
+
+  /**
+   * Creates a new warehouse or updates an existing warehouse.
+   */
+  const handleSaveWarehouse = async (event: React.FormEvent) => {
     event.preventDefault();
 
     setIsSubmitting(true);
 
     try {
-      await createWarehouse(formData);
+      if (editingWarehouseId) {
+        await updateWarehouse(editingWarehouseId, formData);
+      } else {
+        await createWarehouse(formData);
+      }
+
       await loadWarehouses();
 
       setFormData({
         locationName: "",
         address: "",
       });
+
+      setEditingWarehouseId(null);
     } catch (error) {
-      console.error("Failed to create warehouse", error);
+      console.error("Failed to save warehouse", error);
     } finally {
       setIsSubmitting(false);
     }
@@ -60,7 +90,7 @@ const WarehousesPage = () => {
         <p className="mt-2 text-slate-400">Manage warehouse locations.</p>
 
         <form
-          onSubmit={handleCreateWarehouse}
+          onSubmit={handleSaveWarehouse}
           className="mt-8 grid grid-cols-1 gap-4 rounded-xl border border-slate-800 bg-slate-900 p-6 md:grid-cols-2"
         >
           <input
@@ -96,7 +126,13 @@ const WarehousesPage = () => {
             disabled={isSubmitting}
             className="rounded-lg bg-cyan-500 px-4 py-3 font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60 md:col-span-2"
           >
-            {isSubmitting ? "Creating Warehouse..." : "Add Warehouse"}
+            {isSubmitting
+              ? editingWarehouseId
+                ? "Updating Warehouse..."
+                : "Creating Warehouse..."
+              : editingWarehouseId
+                ? "Update Warehouse"
+                : "Add Warehouse"}
           </button>
         </form>
 
@@ -115,6 +151,7 @@ const WarehousesPage = () => {
                 <tr>
                   <th className="px-6 py-3">Location</th>
                   <th className="px-6 py-3">Address</th>
+                  <th className="px-6 py-3">Actions</th>
                 </tr>
               </thead>
 
@@ -127,6 +164,16 @@ const WarehousesPage = () => {
 
                     <td className="px-6 py-4 text-slate-300">
                       {warehouse.address}
+                    </td>
+
+                    <td className="px-6 py-4">
+                      <button
+                        type="button"
+                        onClick={() => handleEditWarehouse(warehouse)}
+                        className="rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-slate-950"
+                      >
+                        Edit
+                      </button>
                     </td>
                   </tr>
                 ))}
