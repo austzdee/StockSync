@@ -80,7 +80,8 @@ public class ProductsController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize]
+    
     public async Task<ActionResult<Product>> Create(CreateProductDto dto)
     {
         if (string.IsNullOrWhiteSpace(dto.Name) ||
