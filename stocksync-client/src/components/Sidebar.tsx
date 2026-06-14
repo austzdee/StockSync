@@ -1,4 +1,5 @@
 import stockSyncLogo from "../assets/stocksync-logo.png";
+import { NavLink } from "react-router-dom";
 
 const Sidebar = () => {
   return (
@@ -26,9 +27,12 @@ const Sidebar = () => {
           </li>
 
           <li>
-            <button className="w-full rounded-lg px-4 py-3 text-left text-slate-300 hover:bg-slate-800">
+            <NavLink
+              to="/products"
+              className="block w-full rounded-lg px-4 py-3 text-slate-300 hover:bg-slate-800"
+            >
               Products
-            </button>
+            </NavLink>
           </li>
 
           <li>
