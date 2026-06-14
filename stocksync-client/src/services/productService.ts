@@ -51,3 +51,10 @@ export const updateProduct = async (
 
   return response.data;
 };
+
+/**
+ * Deletes an existing product record.
+ */
+export const deleteProduct = async (id: number): Promise<void> => {
+  await api.delete(`/Products/${id}`);
+};

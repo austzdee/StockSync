@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import DashboardLayout from "../layouts/DashboardLayout";
 import {
   createProduct,
+  deleteProduct,
   getProducts,
   updateProduct,
   type CreateProductRequest,
@@ -9,18 +10,22 @@ import {
 } from "../services/productService";
 
 const ProductsPage = () => {
-  // State to track which product is currently being edited (if any).
+  // ID of the product currently being edited; null means create mode.
   const [editingProductId, setEditingProductId] = useState<number | null>(null);
-  // Product data fetched from the API and displayed in the table.
+
+  // Product list loaded from the API and shown in the table.
   const [products, setProducts] = useState<Product[]>([]);
 
-  // Loading state for initial data fetch.
+  // Tracks whether the initial products load is still in progress.
   const [isLoading, setIsLoading] = useState(true);
 
-  // Submission state to disable the form while saving a product.
+  // Disables the create/update form while the request is pending.
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Local form state for the create product form.
+  // Indicates which product is currently being deleted.
+  const [deletingProductId, setDeletingProductId] = useState<number | null>(null);
+
+  // Form state used for both create and edit operations.
   const [formData, setFormData] = useState<CreateProductRequest>({
     name: "",
     sku: "",
@@ -43,6 +48,7 @@ const ProductsPage = () => {
   };
 
   const handleEditClick = (product: Product) => {
+    // Populate the form with the selected product so the user can update it.
     setFormData({
       name: product.name,
       sku: product.sku,
@@ -53,7 +59,7 @@ const ProductsPage = () => {
     setEditingProductId(product.id);
   };
 
-  // Fetch products once when the page mounts.
+  // Load products once when the component mounts.
   useEffect(() => {
     loadProducts();
   }, []);
@@ -87,6 +93,24 @@ const ProductsPage = () => {
       console.error("Failed to save product", error);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteProduct = async (productId: number) => {
+    // Confirm deletion before calling the API.
+    if (!window.confirm("Delete this product?")) {
+      return;
+    }
+
+    setDeletingProductId(productId);
+
+    try {
+      await deleteProduct(productId);
+      await loadProducts();
+    } catch (error) {
+      console.error("Failed to delete product", error);
+    } finally {
+      setDeletingProductId(null);
     }
   };
 
@@ -163,7 +187,7 @@ const ProductsPage = () => {
               : editingProductId
                 ? "Update Product"
                 : "Add Product"}
-          </button>
+          </button>               
         </form>
 
         {/* Products table container */}
@@ -199,13 +223,22 @@ const ProductsPage = () => {
                     <td className="px-6 py-4 text-slate-300">
                       £{product.price.toFixed(2)}
                     </td>
-                    <td className="px-6 py-4">
+                    {/* Edit and delete actions for each product row */}
+                    <td className="flex gap-2 px-6 py-4">
                       <button
                         type="button"
                         onClick={() => handleEditClick(product)}
                         className="rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-slate-950 transition hover:bg-amber-400"
                       >
                         Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteProduct(product.id)}
+                        disabled={deletingProductId === product.id}
+                        className="rounded-lg bg-rose-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-400 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {deletingProductId === product.id ? "Deleting..." : "Delete"}
                       </button>
                     </td>
                   </tr>
