@@ -1,27 +1,198 @@
+import { useEffect, useState } from "react";
 import DashboardLayout from "../layouts/DashboardLayout";
+import { getProducts, type Product } from "../services/productService";
+import { getWarehouses, type Warehouse } from "../services/warehouseService";
+import {
+  assignStock,
+  getStock,
+  type AssignStockRequest,
+  type StockItem,
+} from "../services/stockService";
 
-// Page: Stock Transfers — UI surface for assigning, reserving and transferring stock between warehouses.
 const StockTransfersPage = () => {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [stockItems, setStockItems] = useState<StockItem[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+ const [formData, setFormData] = useState<AssignStockRequest>({
+  productId: 0,
+  warehouseId: 0,
+  quantityAvailable: 0,
+});
+
+  /**
+   * Loads products, warehouses and stock records required for stock assignment.
+   */
+  const loadStockPageData = async () => {
+    try {
+      const [productData, warehouseData, stockData] = await Promise.all([
+        getProducts(),
+        getWarehouses(),
+        getStock(),
+      ]);
+
+      setProducts(productData);
+      setWarehouses(warehouseData);
+      setStockItems(stockData.results);
+    } catch (error) {
+      console.error("Failed to load stock page data", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
+   * Assigns stock quantity to a selected product and warehouse.
+   */
+  const handleAssignStock = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    setIsSubmitting(true);
+
+    try {
+      await assignStock(formData);
+      await loadStockPageData();
+
+      setFormData({
+        productId: 0,
+        warehouseId: 0,
+        quantityAvailable: 0,
+      });
+    } catch (error) {
+      console.error("Failed to assign stock", error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  useEffect(() => {
+    loadStockPageData();
+  }, []);
+
   return (
     <DashboardLayout>
       <div>
-        <h1 className="text-3xl font-bold text-white">
-          Stock Operations
-        </h1>
+        <h1 className="text-3xl font-bold text-white">Stock Operations</h1>
 
         <p className="mt-2 text-slate-400">
           Manage stock assignment, reservations and transfers.
         </p>
 
-        {/* Container: stock operations overview and controls (placeholders) */}
-        <div className="mt-8 rounded-xl border border-slate-800 bg-slate-900 p-6">
-          <h2 className="text-lg font-semibold text-white">
-            Stock Management
-          </h2>
+        <form
+          onSubmit={handleAssignStock}
+          className="mt-8 grid grid-cols-1 gap-4 rounded-xl border border-slate-800 bg-slate-900 p-6 md:grid-cols-4"
+        >
+          <select
+            value={formData.productId}
+            onChange={(event) =>
+              setFormData({
+                ...formData,
+                productId: Number(event.target.value),
+              })
+            }
+            className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white outline-none focus:border-cyan-500"
+            required
+          >
+            <option value={0}>Select product</option>
+            {products.map((product) => (
+              <option key={product.id} value={product.id}>
+                {product.name}
+              </option>
+            ))}
+          </select>
 
-          <p className="mt-3 text-slate-400">
-            Stock operations will appear here.
-          </p>
+          <select
+            value={formData.warehouseId}
+            onChange={(event) =>
+              setFormData({
+                ...formData,
+                warehouseId: Number(event.target.value),
+              })
+            }
+            className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white outline-none focus:border-cyan-500"
+            required
+          >
+            <option value={0}>Select warehouse</option>
+            {warehouses.map((warehouse) => (
+              <option key={warehouse.id} value={warehouse.id}>
+                {warehouse.locationName}
+              </option>
+            ))}
+          </select>
+
+          <input
+            type="number"
+            placeholder="Quantity"
+            value={formData.quantityAvailable}
+            onChange={(event) =>
+              setFormData({
+                ...formData,
+                quantityAvailable: Number(event.target.value),
+              })
+            }
+            className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white outline-none focus:border-cyan-500"
+            min="1"
+            required
+          />
+
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="rounded-lg bg-cyan-500 px-4 py-3 font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSubmitting ? "Assigning..." : "Assign Stock"}
+          </button>
+        </form>
+
+        <div className="mt-8 rounded-xl border border-slate-800 bg-slate-900">
+          <div className="border-b border-slate-800 px-6 py-4">
+            <h2 className="text-lg font-semibold text-white">Stock Records</h2>
+          </div>
+
+          {isLoading ? (
+            <p className="p-6 text-slate-400">Loading stock records...</p>
+          ) : stockItems.length === 0 ? (
+            <p className="p-6 text-slate-400">No stock records found.</p>
+          ) : (
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-950 text-slate-400">
+                <tr>
+                  <th className="px-6 py-3">Product</th>
+                  <th className="px-6 py-3">Warehouse</th>
+                  <th className="px-6 py-3">Available</th>
+                  <th className="px-6 py-3">Reserved</th>
+                  <th className="px-6 py-3">Total</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {stockItems.map((item) => (
+                  <tr
+                    key={`${item.productId}-${item.warehouseId}`}
+                    className="border-t border-slate-800"
+                  >
+                    <td className="px-6 py-4 text-white">
+                      {item.productName}
+                    </td>
+                    <td className="px-6 py-4 text-slate-300">
+                      {item.warehouseName}
+                    </td>
+                    <td className="px-6 py-4 text-slate-300">
+                      {item.quantityAvailable}
+                    </td>
+                    <td className="px-6 py-4 text-slate-300">
+                      {item.quantityReserved}
+                    </td>
+                    <td className="px-6 py-4 text-slate-300">
+                      {item.totalQuantity}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </DashboardLayout>

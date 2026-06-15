@@ -65,14 +65,14 @@ const Sidebar = () => {
 
           <li>
             <NavLink
-              to="/transfers"
+              to="/stock-transfers"
               className={({ isActive }) =>
                 `block w-full rounded-lg px-4 py-3 text-left ${
                   isActive ? "bg-slate-800 text-white" : "text-slate-300 hover:bg-slate-800"
                 }`
               }
             >
-              Stock Transfers
+              Stock Operations
             </NavLink>
           </li>
 
