@@ -7,6 +7,7 @@ import WarehousesPage from "./pages/WarehousesPage";
 import StockTransfersPage from "./pages/StockTransfersPage";
 import ReportsPage from "./pages/ReportsPage";
 
+
 function App() {
   return (
     <BrowserRouter>
