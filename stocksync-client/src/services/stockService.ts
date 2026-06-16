@@ -31,6 +31,13 @@ export interface ReleaseStockRequest {
   quantity: number;
 }
 
+export interface TransferStockRequest {
+  productId: number;
+  fromWarehouseId: number;
+  toWarehouseId: number;
+  quantity: number;
+}
+
 /**
  * Retrieves stock records from the backend API.
  */
@@ -76,4 +83,14 @@ export const releaseStock = async (
   request: ReleaseStockRequest
 ): Promise<void> => {
   await api.post("/Stock/release", request);
+};
+
+/**
+ * Transfers stock from one warehouse to another.
+ */
+
+export const transferStock = async (
+  request: TransferStockRequest
+): Promise<void> => {
+  await api.post("/Stock/transfer", request);
 };
