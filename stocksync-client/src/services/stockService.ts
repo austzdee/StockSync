@@ -25,6 +25,12 @@ export interface AssignStockRequest {
   quantityAvailable: number;
 }
 
+export interface ReleaseStockRequest {
+  productId: number;
+  warehouseId: number;
+  quantity: number;
+}
+
 /**
  * Retrieves stock records from the backend API.
  */
@@ -43,4 +49,31 @@ export const assignStock = async (
   request: AssignStockRequest
 ): Promise<void> => {
   await api.post("/Stock/assign", request);
+};
+
+/**
+ * Unassigns stock quantity from a product in a warehouse.
+ */
+export interface ReserveStockRequest {
+  productId: number;
+  warehouseId: number;
+  quantity: number;
+}
+
+/**
+ * Reserves stock for a product.
+ */
+export const reserveStock = async (
+  request: ReserveStockRequest
+): Promise<void> => {
+  await api.post("/Stock/reserve", request);
+};
+
+/**
+ * Releases reserved stock back into available stock.
+ */
+export const releaseStock = async (
+  request: ReleaseStockRequest
+): Promise<void> => {
+  await api.post("/Stock/release", request);
 };

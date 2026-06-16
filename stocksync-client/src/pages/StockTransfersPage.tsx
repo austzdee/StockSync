@@ -5,25 +5,57 @@ import { getWarehouses, type Warehouse } from "../services/warehouseService";
 import {
   assignStock,
   getStock,
+  releaseStock,
+  reserveStock,
   type AssignStockRequest,
+  type ReleaseStockRequest,
+  type ReserveStockRequest,
   type StockItem,
 } from "../services/stockService";
 
+/**
+ * Stock Operations page.
+ * Provides inventory workflows for assigning and reserving stock.
+ */
 const StockTransfersPage = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isAssigning, setIsAssigning] = useState(false);
+  const [isReleasing, setIsReleasing] = useState(false);
+  const [isReserving, setIsReserving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
- const [formData, setFormData] = useState<AssignStockRequest>({
-  productId: 0,
-  warehouseId: 0,
-  quantityAvailable: 0,
-});
+  /**
+   * Form state used when assigning stock to a warehouse.
+   */
+  const [formData, setFormData] = useState<AssignStockRequest>({
+    productId: 0,
+    warehouseId: 0,
+    quantityAvailable: 0,
+  });
 
   /**
-   * Loads products, warehouses and stock records required for stock assignment.
+   * Form state used when reserving stock from available inventory.
+   */
+  const [reserveData, setReserveData] = useState<ReserveStockRequest>({
+    productId: 0,
+    warehouseId: 0,
+    quantity: 0,
+  });
+
+  /**
+   * Stores release stock form values.
+   */
+
+  const [releaseData, setReleaseData] = useState<ReleaseStockRequest>({
+    productId: 0,
+    warehouseId: 0,
+    quantity: 0,
+  });
+
+  /**
+   * Loads products, warehouses, and stock records required by the page.
    */
   const loadStockPageData = async () => {
     try {
@@ -49,7 +81,7 @@ const StockTransfersPage = () => {
   const handleAssignStock = async (event: React.FormEvent) => {
     event.preventDefault();
 
-    setIsSubmitting(true);
+    setIsAssigning(true);
 
     try {
       await assignStock(formData);
@@ -63,10 +95,61 @@ const StockTransfersPage = () => {
     } catch (error) {
       console.error("Failed to assign stock", error);
     } finally {
-      setIsSubmitting(false);
+      setIsAssigning(false);
     }
   };
 
+  /**
+   * Reserves stock quantity from available stock.
+   */
+  const handleReserveStock = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    setIsReserving(true);
+
+    try {
+      await reserveStock(reserveData);
+      await loadStockPageData();
+
+      setReserveData({
+        productId: 0,
+        warehouseId: 0,
+        quantity: 0,
+      });
+    } catch (error) {
+      console.error("Failed to reserve stock", error);
+    } finally {
+      setIsReserving(false);
+    }
+  };
+
+  /**
+   * Releases reserved stock back into available stock.
+   */
+  const handleReleaseStock = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    setIsReleasing(true);
+
+    try {
+      await releaseStock(releaseData);
+      await loadStockPageData();
+
+      setReleaseData({
+        productId: 0,
+        warehouseId: 0,
+        quantity: 0,
+      });
+    } catch (error) {
+      console.error("Failed to release stock", error);
+    } finally {
+      setIsReleasing(false);
+    }
+  };
+
+  /**
+   * Loads stock operation data when the page first renders.
+   */
   useEffect(() => {
     loadStockPageData();
   }, []);
@@ -80,6 +163,7 @@ const StockTransfersPage = () => {
           Manage stock assignment, reservations and transfers.
         </p>
 
+        {/* Assign Stock Form */}
         <form
           onSubmit={handleAssignStock}
           className="mt-8 grid grid-cols-1 gap-4 rounded-xl border border-slate-800 bg-slate-900 p-6 md:grid-cols-4"
@@ -139,13 +223,149 @@ const StockTransfersPage = () => {
 
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isAssigning}
             className="rounded-lg bg-cyan-500 px-4 py-3 font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isSubmitting ? "Assigning..." : "Assign Stock"}
+            {isAssigning ? "Assigning..." : "Assign Stock"}
           </button>
         </form>
 
+        {/* Reserve Stock Form */}
+        <form
+          onSubmit={handleReserveStock}
+          className="mt-6 grid grid-cols-1 gap-4 rounded-xl border border-slate-800 bg-slate-900 p-6 md:grid-cols-4"
+        >
+          <select
+            value={reserveData.productId}
+            onChange={(event) =>
+              setReserveData({
+                ...reserveData,
+                productId: Number(event.target.value),
+              })
+            }
+            className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white outline-none focus:border-amber-500"
+            required
+          >
+            <option value={0}>Select product</option>
+            {products.map((product) => (
+              <option key={product.id} value={product.id}>
+                {product.name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={reserveData.warehouseId}
+            onChange={(event) =>
+              setReserveData({
+                ...reserveData,
+                warehouseId: Number(event.target.value),
+              })
+            }
+            className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white outline-none focus:border-amber-500"
+            required
+          >
+            <option value={0}>Select warehouse</option>
+            {warehouses.map((warehouse) => (
+              <option key={warehouse.id} value={warehouse.id}>
+                {warehouse.locationName}
+              </option>
+            ))}
+          </select>
+
+          <input
+            type="number"
+            placeholder="Reserve quantity"
+            value={reserveData.quantity}
+            onChange={(event) =>
+              setReserveData({
+                ...reserveData,
+                quantity: Number(event.target.value),
+              })
+            }
+            className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white outline-none focus:border-amber-500"
+            min="1"
+            required
+          />
+
+          <button
+            type="submit"
+            disabled={isReserving}
+            className="rounded-lg bg-amber-500 px-4 py-3 font-semibold text-slate-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isReserving ? "Reserving..." : "Reserve Stock"}
+          </button>
+        </form>
+
+        {/* Release Stock Form */}
+
+        <form
+          onSubmit={handleReleaseStock}
+          className="mt-6 grid grid-cols-1 gap-4 rounded-xl border border-slate-800 bg-slate-900 p-6 md:grid-cols-4"
+        >
+          <select
+            value={releaseData.productId}
+            onChange={(event) =>
+              setReleaseData({
+                ...releaseData,
+                productId: Number(event.target.value),
+              })
+            }
+            className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white outline-none focus:border-emerald-500"
+            required
+          >
+            <option value={0}>Select product</option>
+            {products.map((product) => (
+              <option key={product.id} value={product.id}>
+                {product.name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={releaseData.warehouseId}
+            onChange={(event) =>
+              setReleaseData({
+                ...releaseData,
+                warehouseId: Number(event.target.value),
+              })
+            }
+            className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white outline-none focus:border-emerald-500"
+            required
+          >
+            <option value={0}>Select warehouse</option>
+            {warehouses.map((warehouse) => (
+              <option key={warehouse.id} value={warehouse.id}>
+                {warehouse.locationName}
+              </option>
+            ))}
+          </select>
+
+          <input
+            type="number"
+            placeholder="Release quantity"
+            value={releaseData.quantity}
+            onChange={(event) =>
+              setReleaseData({
+                ...releaseData,
+                quantity: Number(event.target.value),
+              })
+            }
+            className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white outline-none focus:border-emerald-500"
+            min="1"
+            required
+          />
+
+          <button
+            type="submit"
+            disabled={isReleasing}
+            className="rounded-lg bg-emerald-500 px-4 py-3 font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isReleasing ? "Releasing..." : "Release Stock"}
+          </button>
+        </form>
+
+        {/* Stock Records Table */}
         <div className="mt-8 rounded-xl border border-slate-800 bg-slate-900">
           <div className="border-b border-slate-800 px-6 py-4">
             <h2 className="text-lg font-semibold text-white">Stock Records</h2>
@@ -173,18 +393,20 @@ const StockTransfersPage = () => {
                     key={`${item.productId}-${item.warehouseId}`}
                     className="border-t border-slate-800"
                   >
-                    <td className="px-6 py-4 text-white">
-                      {item.productName}
-                    </td>
+                    <td className="px-6 py-4 text-white">{item.productName}</td>
+
                     <td className="px-6 py-4 text-slate-300">
                       {item.warehouseName}
                     </td>
+
                     <td className="px-6 py-4 text-slate-300">
                       {item.quantityAvailable}
                     </td>
+
                     <td className="px-6 py-4 text-slate-300">
                       {item.quantityReserved}
                     </td>
+
                     <td className="px-6 py-4 text-slate-300">
                       {item.totalQuantity}
                     </td>
