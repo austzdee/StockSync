@@ -7,10 +7,12 @@ import {
   getStock,
   releaseStock,
   reserveStock,
+  transferStock,
   type AssignStockRequest,
   type ReleaseStockRequest,
   type ReserveStockRequest,
   type StockItem,
+  type TransferStockRequest,
 } from "../services/stockService";
 
 /**
@@ -24,6 +26,7 @@ const StockTransfersPage = () => {
   const [isAssigning, setIsAssigning] = useState(false);
   const [isReleasing, setIsReleasing] = useState(false);
   const [isReserving, setIsReserving] = useState(false);
+  const [isTransferring, setIsTransferring] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   /**
@@ -51,6 +54,17 @@ const StockTransfersPage = () => {
   const [releaseData, setReleaseData] = useState<ReleaseStockRequest>({
     productId: 0,
     warehouseId: 0,
+    quantity: 0,
+  });
+
+  /**
+   * Transfer stock request payload.
+   * Moves stock from one warehouse to another.
+   */
+  const [transferData, setTransferData] = useState<TransferStockRequest>({
+    productId: 0,
+    fromWarehouseId: 0,
+    toWarehouseId: 0,
     quantity: 0,
   });
 
@@ -144,6 +158,31 @@ const StockTransfersPage = () => {
       console.error("Failed to release stock", error);
     } finally {
       setIsReleasing(false);
+    }
+  };
+
+  /**
+   * Transfers stock from one warehouse to another.
+   */
+  const handleTransferStock = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    setIsTransferring(true);
+
+    try {
+      await transferStock(transferData);
+      await loadStockPageData();
+
+      setTransferData({
+        productId: 0,
+        fromWarehouseId: 0,
+        toWarehouseId: 0,
+        quantity: 0,
+      });
+    } catch (error) {
+      console.error("Failed to transfer stock", error);
+    } finally {
+      setIsTransferring(false);
     }
   };
 
@@ -362,6 +401,93 @@ const StockTransfersPage = () => {
             className="rounded-lg bg-emerald-500 px-4 py-3 font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isReleasing ? "Releasing..." : "Release Stock"}
+          </button>
+        </form>
+
+        {/* Transfer Stock Form */}
+        {/* Transfer Stock Form */}
+        <form
+          onSubmit={handleTransferStock}
+          className="mt-6 grid grid-cols-1 gap-4 rounded-xl border border-slate-800 bg-slate-900 p-6 md:grid-cols-5"
+        >
+          <select
+            value={transferData.productId}
+            onChange={(event) =>
+              setTransferData({
+                ...transferData,
+                productId: Number(event.target.value),
+              })
+            }
+            className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white outline-none focus:border-purple-500"
+            required
+          >
+            <option value={0}>Select product</option>
+            {products.map((product) => (
+              <option key={product.id} value={product.id}>
+                {product.name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={transferData.fromWarehouseId}
+            onChange={(event) =>
+              setTransferData({
+                ...transferData,
+                fromWarehouseId: Number(event.target.value),
+              })
+            }
+            className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white outline-none focus:border-purple-500"
+            required
+          >
+            <option value={0}>From warehouse</option>
+            {warehouses.map((warehouse) => (
+              <option key={warehouse.id} value={warehouse.id}>
+                {warehouse.locationName}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={transferData.toWarehouseId}
+            onChange={(event) =>
+              setTransferData({
+                ...transferData,
+                toWarehouseId: Number(event.target.value),
+              })
+            }
+            className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white outline-none focus:border-purple-500"
+            required
+          >
+            <option value={0}>To warehouse</option>
+            {warehouses.map((warehouse) => (
+              <option key={warehouse.id} value={warehouse.id}>
+                {warehouse.locationName}
+              </option>
+            ))}
+          </select>
+
+          <input
+            type="number"
+            placeholder="Transfer quantity"
+            value={transferData.quantity}
+            onChange={(event) =>
+              setTransferData({
+                ...transferData,
+                quantity: Number(event.target.value),
+              })
+            }
+            className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white outline-none focus:border-purple-500"
+            min="1"
+            required
+          />
+
+          <button
+            type="submit"
+            disabled={isTransferring}
+            className="rounded-lg bg-purple-500 px-4 py-3 font-semibold text-white transition hover:bg-purple-400 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isTransferring ? "Transferring..." : "Transfer Stock"}
           </button>
         </form>
 

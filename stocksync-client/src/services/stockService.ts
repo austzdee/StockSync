@@ -59,7 +59,7 @@ export const assignStock = async (
 };
 
 /**
- * Unassigns stock quantity from a product in a warehouse.
+ * Request payload used when reserving available stock.
  */
 export interface ReserveStockRequest {
   productId: number;
