@@ -1,0 +1,20 @@
+services:
+  api:
+    build:
+      context: ./StockSync
+      dockerfile: Dockerfile
+    container_name: stocksync-api
+    ports:
+      - "8081:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+
+  client:
+    build:
+      context: ./stocksync-client
+      dockerfile: Dockerfile
+    container_name: stocksync-client
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
