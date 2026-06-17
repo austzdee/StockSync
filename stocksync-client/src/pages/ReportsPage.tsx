@@ -93,8 +93,9 @@ const ReportsPage = () => {
   };
 
   return (
-    <DashboardLayout>
-      <div className="space-y-8">
+  <DashboardLayout>
+    <div className="space-y-8">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-3xl font-bold text-white">Reports</h1>
 
@@ -103,47 +104,58 @@ const ReportsPage = () => {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-          <DashboardCard
-            title="Total Products"
-            value={products.length}
-            description="Products currently tracked"
-          />
+        <div className="flex gap-3">
+          <button className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800">
+            Export CSV
+          </button>
 
-          <DashboardCard
-            title="Warehouses"
-            value={warehouses.length}
-            description="Active storage locations"
-            tone="success"
-          />
-
-          <DashboardCard
-            title="Available Units"
-            value={totalAvailableUnits}
-            description="Units available for allocation"
-          />
-
-          <DashboardCard
-            title="Reserved Units"
-            value={totalReservedUnits}
-            description="Units currently reserved"
-            tone="danger"
-          />
-
-          <DashboardCard
-            title="Inventory Units"
-            value={totalInventoryUnits}
-            description="Total available and reserved units"
-            tone="success"
-          />
-
-          <DashboardCard
-            title="Low Stock Items"
-            value={lowStockItems.length}
-            description="Stock records below threshold"
-            tone="warning"
-          />
+          <button className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-slate-950 hover:bg-amber-400">
+            Export PDF
+          </button>
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+        <DashboardCard
+          title="Total Products"
+          value={products.length}
+          description="Products currently tracked"
+        />
+
+        <DashboardCard
+          title="Warehouses"
+          value={warehouses.length}
+          description="Active storage locations"
+          tone="success"
+        />
+
+        <DashboardCard
+          title="Available Units"
+          value={totalAvailableUnits}
+          description="Units available for allocation"
+        />
+
+        <DashboardCard
+          title="Reserved Units"
+          value={totalReservedUnits}
+          description="Units currently reserved"
+          tone="danger"
+        />
+
+        <DashboardCard
+          title="Inventory Units"
+          value={totalInventoryUnits}
+          description="Total available and reserved units"
+          tone="success"
+        />
+
+        <DashboardCard
+          title="Low Stock Items"
+          value={lowStockItems.length}
+          description="Stock records below threshold"
+          tone="warning"
+        />
+      </div>
 
         <section className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
           <div className="border-b border-slate-800 px-6 py-4">
