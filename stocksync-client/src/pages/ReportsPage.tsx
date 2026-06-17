@@ -119,10 +119,37 @@ const ReportsPage = () => {
     return "Healthy";
   };
 
-  const handleExportCsv = () => {
-    // generate CSV
-    // download file
-  };
+ const handleExportCsv = () => {
+    alert(`Exporting ${lowStockItems.length} low stock items`);
+  const headers = ["Product", "Warehouse", "Available", "Reserved", "Total"];
+
+  const rows = lowStockItems.map((item) => [
+    item.productName,
+    item.warehouseName,
+    item.quantityAvailable,
+    item.quantityReserved,
+    item.totalQuantity,
+  ]);
+
+  const csvContent = [headers, ...rows]
+    .map((row) => row.map((value) => `"${value}"`).join(","))
+    .join("\n");
+
+  const blob = new Blob([csvContent], {
+    type: "text/csv;charset=utf-8;",
+  });
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+ document.body.appendChild(link);
+link.click();
+document.body.removeChild(link);
+
+setTimeout(() => {
+  URL.revokeObjectURL(url);
+}, 100);
+};
 
   return (
     <DashboardLayout>
