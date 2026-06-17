@@ -1,16 +1,12 @@
 import { useEffect, useState } from "react";
 import DashboardCard from "../components/DashboardCard";
+import ReportsChart from "../components/ReportsChart";
 import DashboardLayout from "../layouts/DashboardLayout";
 import { getProducts, type Product } from "../services/productService";
 import { getWarehouses, type Warehouse } from "../services/warehouseService";
 import { getStock, type StockItem } from "../services/stockService";
 import { getAuditLogs, type AuditLog } from "../services/auditService";
 
-/**
- * Reports page.
- * Provides inventory analytics and operational reporting
- * using real-time stock, product and warehouse data.
- */
 const ReportsPage = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -57,6 +53,37 @@ const ReportsPage = () => {
 
   const lowStockItems = stockItems.filter((item) => item.totalQuantity < 10);
 
+ const inventoryByProduct = Object.values(
+  stockItems.reduce<Record<string, { name: string; value: number }>>(
+    (result, item) => {
+      const productName = item.productName;
+
+      if (!result[productName]) {
+        result[productName] = {
+          name: productName,
+          value: 0,
+        };
+      }
+
+      result[productName].value += item.totalQuantity;
+
+      return result;
+    },
+    {}
+  )
+);
+
+  const inventoryByWarehouse = warehouses.map((warehouse) => {
+    const warehouseStock = stockItems
+      .filter((item) => item.warehouseId === warehouse.id)
+      .reduce((sum, item) => sum + item.totalQuantity, 0);
+
+    return {
+      name: warehouse.locationName,
+      value: warehouseStock,
+    };
+  });
+
   const getProductName = (productId: number) => {
     return (
       products.find((product) => product.id === productId)?.name ??
@@ -93,69 +120,69 @@ const ReportsPage = () => {
   };
 
   return (
-  <DashboardLayout>
-    <div className="space-y-8">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-white">Reports</h1>
+    <DashboardLayout>
+      <div className="space-y-8">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-white">Reports</h1>
 
-          <p className="mt-2 text-slate-400">
-            Inventory insights, stock risks and warehouse summaries.
-          </p>
+            <p className="mt-2 text-slate-400">
+              Inventory insights, stock risks and warehouse summaries.
+            </p>
+          </div>
+
+          <div className="flex gap-3">
+            <button className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800">
+              Export CSV
+            </button>
+
+            <button className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-slate-950 hover:bg-amber-400">
+              Export PDF
+            </button>
+          </div>
         </div>
 
-        <div className="flex gap-3">
-          <button className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800">
-            Export CSV
-          </button>
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+          <DashboardCard
+            title="Total Products"
+            value={products.length}
+            description="Products currently tracked"
+          />
 
-          <button className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-slate-950 hover:bg-amber-400">
-            Export PDF
-          </button>
+          <DashboardCard
+            title="Warehouses"
+            value={warehouses.length}
+            description="Active storage locations"
+            tone="success"
+          />
+
+          <DashboardCard
+            title="Available Units"
+            value={totalAvailableUnits}
+            description="Units available for allocation"
+          />
+
+          <DashboardCard
+            title="Reserved Units"
+            value={totalReservedUnits}
+            description="Units currently reserved"
+            tone="danger"
+          />
+
+          <DashboardCard
+            title="Inventory Units"
+            value={totalInventoryUnits}
+            description="Total available and reserved units"
+            tone="success"
+          />
+
+          <DashboardCard
+            title="Low Stock Items"
+            value={lowStockItems.length}
+            description="Stock records below threshold"
+            tone="warning"
+          />
         </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-        <DashboardCard
-          title="Total Products"
-          value={products.length}
-          description="Products currently tracked"
-        />
-
-        <DashboardCard
-          title="Warehouses"
-          value={warehouses.length}
-          description="Active storage locations"
-          tone="success"
-        />
-
-        <DashboardCard
-          title="Available Units"
-          value={totalAvailableUnits}
-          description="Units available for allocation"
-        />
-
-        <DashboardCard
-          title="Reserved Units"
-          value={totalReservedUnits}
-          description="Units currently reserved"
-          tone="danger"
-        />
-
-        <DashboardCard
-          title="Inventory Units"
-          value={totalInventoryUnits}
-          description="Total available and reserved units"
-          tone="success"
-        />
-
-        <DashboardCard
-          title="Low Stock Items"
-          value={lowStockItems.length}
-          description="Stock records below threshold"
-          tone="warning"
-        />
-      </div>
 
         <section className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
           <div className="border-b border-slate-800 px-6 py-4">
@@ -203,6 +230,18 @@ const ReportsPage = () => {
             </tbody>
           </table>
         </section>
+
+        <div className="grid gap-8 xl:grid-cols-2">
+          <ReportsChart
+            title="Inventory by Product"
+            data={inventoryByProduct}
+          />
+
+          <ReportsChart
+            title="Inventory by Warehouse"
+            data={inventoryByWarehouse}
+          />
+        </div>
 
         <section className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
           <div className="border-b border-slate-800 px-6 py-4">
