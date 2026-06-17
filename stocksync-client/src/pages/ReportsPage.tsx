@@ -12,6 +12,9 @@ const ReportsPage = () => {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState("all");
+  const [showLowStockOnly, setShowLowStockOnly] = useState(false);
 
   useEffect(() => {
     const loadReportData = async () => {
@@ -36,25 +39,41 @@ const ReportsPage = () => {
     loadReportData();
   }, []);
 
-  const totalAvailableUnits = stockItems.reduce(
+  const filteredStockItems = stockItems.filter((item) => {
+    const matchesSearch = item.productName
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase());
+
+    const matchesWarehouse =
+      selectedWarehouseId === "all" ||
+      item.warehouseId === Number(selectedWarehouseId);
+
+    const matchesLowStock = !showLowStockOnly || item.totalQuantity < 10;
+
+    return matchesSearch && matchesWarehouse && matchesLowStock;
+  });
+
+  const totalAvailableUnits = filteredStockItems.reduce(
     (sum, item) => sum + item.quantityAvailable,
-    0,
+    0
   );
 
-  const totalReservedUnits = stockItems.reduce(
+  const totalReservedUnits = filteredStockItems.reduce(
     (sum, item) => sum + item.quantityReserved,
-    0,
+    0
   );
 
-  const totalInventoryUnits = stockItems.reduce(
+  const totalInventoryUnits = filteredStockItems.reduce(
     (sum, item) => sum + item.totalQuantity,
-    0,
+    0
   );
 
-  const lowStockItems = stockItems.filter((item) => item.totalQuantity < 10);
+  const lowStockItems = filteredStockItems.filter(
+    (item) => item.totalQuantity < 10
+  );
 
   const inventoryByProduct = Object.values(
-    stockItems.reduce<Record<string, { name: string; value: number }>>(
+    filteredStockItems.reduce<Record<string, { name: string; value: number }>>(
       (result, item) => {
         const productName = item.productName;
 
@@ -69,12 +88,12 @@ const ReportsPage = () => {
 
         return result;
       },
-      {},
-    ),
+      {}
+    )
   );
 
   const inventoryByWarehouse = warehouses.map((warehouse) => {
-    const warehouseStock = stockItems
+    const warehouseStock = filteredStockItems
       .filter((item) => item.warehouseId === warehouse.id)
       .reduce((sum, item) => sum + item.totalQuantity, 0);
 
@@ -119,37 +138,39 @@ const ReportsPage = () => {
     return "Healthy";
   };
 
- const handleExportCsv = () => {
-    alert(`Exporting ${lowStockItems.length} low stock items`);
-  const headers = ["Product", "Warehouse", "Available", "Reserved", "Total"];
+  const handleExportCsv = () => {
+    const headers = ["Product", "Warehouse", "Available", "Reserved", "Total"];
 
-  const rows = lowStockItems.map((item) => [
-    item.productName,
-    item.warehouseName,
-    item.quantityAvailable,
-    item.quantityReserved,
-    item.totalQuantity,
-  ]);
+    const rows = lowStockItems.map((item) => [
+      item.productName,
+      item.warehouseName,
+      item.quantityAvailable,
+      item.quantityReserved,
+      item.totalQuantity,
+    ]);
 
-  const csvContent = [headers, ...rows]
-    .map((row) => row.map((value) => `"${value}"`).join(","))
-    .join("\n");
+    const csvContent = [headers, ...rows]
+      .map((row) => row.map((value) => `"${value}"`).join(","))
+      .join("\n");
 
-  const blob = new Blob([csvContent], {
-    type: "text/csv;charset=utf-8;",
-  });
+    const blob = new Blob([csvContent], {
+      type: "text/csv;charset=utf-8;",
+    });
 
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
 
- document.body.appendChild(link);
-link.click();
-document.body.removeChild(link);
+    link.href = url;
+    link.download = "low-stock-report.csv";
 
-setTimeout(() => {
-  URL.revokeObjectURL(url);
-}, 100);
-};
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+    }, 100);
+  };
 
   return (
     <DashboardLayout>
@@ -165,29 +186,112 @@ setTimeout(() => {
 
           <div className="flex gap-3">
             <button
+              type="button"
               onClick={handleExportCsv}
               className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800"
             >
               Export CSV
             </button>
 
-            <button className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-slate-950 hover:bg-amber-400">
+            <button
+              type="button"
+              className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-slate-950 hover:bg-amber-400"
+            >
               Export PDF
             </button>
           </div>
         </div>
 
+        <section className="rounded-xl border border-slate-800 bg-slate-900 p-6">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-300">
+                Search product
+              </label>
+
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="Search by product name..."
+                className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-2 text-sm text-white outline-none focus:border-amber-500"
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-300">
+                Warehouse
+              </label>
+
+              <select
+                value={selectedWarehouseId}
+                onChange={(event) => setSelectedWarehouseId(event.target.value)}
+                className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-2 text-sm text-white outline-none focus:border-amber-500"
+              >
+                <option value="all">All warehouses</option>
+
+                {warehouses.map((warehouse) => (
+                  <option key={warehouse.id} value={warehouse.id}>
+                    {warehouse.locationName}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex items-end gap-3">
+              <label className="flex items-center gap-3 rounded-lg border border-slate-700 bg-slate-950 px-4 py-2 text-sm text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={showLowStockOnly}
+                  onChange={(event) =>
+                    setShowLowStockOnly(event.target.checked)
+                  }
+                  className="h-4 w-4"
+                />
+                Low stock only
+              </label>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchTerm("");
+                  setSelectedWarehouseId("all");
+                  setShowLowStockOnly(false);
+                }}
+                className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800"
+              >
+                Clear Filters
+              </button>
+            </div>
+          </div>
+
+          <p className="mt-4 text-sm text-slate-400">
+            Showing{" "}
+            <span className="font-semibold text-amber-400">
+              {filteredStockItems.length}
+            </span>{" "}
+            inventory records
+          </p>
+        </section>
+
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
           <DashboardCard
-            title="Total Products"
-            value={products.length}
-            description="Products currently tracked"
+            title="Products"
+            value={
+              new Set(filteredStockItems.map((item) => item.productId)).size
+            }
+            description="Products matching filters"
           />
 
           <DashboardCard
             title="Warehouses"
-            value={warehouses.length}
-            description="Active storage locations"
+            value={
+              selectedWarehouseId === "all"
+                ? warehouses.length
+                : new Set(filteredStockItems.map((item) => item.warehouseId))
+                    .size
+            }
+            description="Storage locations matching filters"
             tone="success"
           />
 
@@ -219,6 +323,18 @@ setTimeout(() => {
           />
         </div>
 
+        <div className="grid gap-8 xl:grid-cols-2">
+          <ReportsChart
+            title="Inventory by Product"
+            data={inventoryByProduct}
+          />
+
+          <ReportsChart
+            title="Inventory by Warehouse"
+            data={inventoryByWarehouse}
+          />
+        </div>
+
         <section className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
           <div className="border-b border-slate-800 px-6 py-4">
             <h2 className="text-lg font-semibold text-white">
@@ -242,7 +358,7 @@ setTimeout(() => {
                   <td className="px-6 py-4">
                     <span
                       className={`rounded-full border px-3 py-1 text-xs font-semibold ${getActionBadgeClass(
-                        log.action,
+                        log.action
                       )}`}
                     >
                       {log.action}
@@ -265,18 +381,6 @@ setTimeout(() => {
             </tbody>
           </table>
         </section>
-
-        <div className="grid gap-8 xl:grid-cols-2">
-          <ReportsChart
-            title="Inventory by Product"
-            data={inventoryByProduct}
-          />
-
-          <ReportsChart
-            title="Inventory by Warehouse"
-            data={inventoryByWarehouse}
-          />
-        </div>
 
         <section className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
           <div className="border-b border-slate-800 px-6 py-4">
