@@ -55,7 +55,9 @@ const Sidebar = () => {
               to="/warehouses"
               className={({ isActive }) =>
                 `block w-full rounded-lg px-4 py-3 text-left ${
-                  isActive ? "bg-slate-800 text-white" : "text-slate-300 hover:bg-slate-800"
+                  isActive
+                    ? "bg-slate-800 text-white"
+                    : "text-slate-300 hover:bg-slate-800"
                 }`
               }
             >
@@ -68,7 +70,9 @@ const Sidebar = () => {
               to="/stock-transfers"
               className={({ isActive }) =>
                 `block w-full rounded-lg px-4 py-3 text-left ${
-                  isActive ? "bg-slate-800 text-white" : "text-slate-300 hover:bg-slate-800"
+                  isActive
+                    ? "bg-slate-800 text-white"
+                    : "text-slate-300 hover:bg-slate-800"
                 }`
               }
             >
@@ -78,10 +82,27 @@ const Sidebar = () => {
 
           <li>
             <NavLink
+              to="/audit-logs"
+              className={({ isActive }) =>
+                `block w-full rounded-lg px-4 py-3 text-left ${
+                  isActive
+                    ? "bg-slate-800 text-white"
+                    : "text-slate-300 hover:bg-slate-800"
+                }`
+              }
+            >
+              Audit Logs
+            </NavLink>
+          </li>
+
+          <li>
+            <NavLink
               to="/reports"
               className={({ isActive }) =>
                 `block w-full rounded-lg px-4 py-3 text-left ${
-                  isActive ? "bg-slate-800 text-white" : "text-slate-300 hover:bg-slate-800"
+                  isActive
+                    ? "bg-slate-800 text-white"
+                    : "text-slate-300 hover:bg-slate-800"
                 }`
               }
             >

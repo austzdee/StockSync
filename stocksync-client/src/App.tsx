@@ -6,6 +6,7 @@ import ProductsPage from "./pages/ProductsPage";
 import WarehousesPage from "./pages/WarehousesPage";
 import StockTransfersPage from "./pages/StockTransfersPage";
 import ReportsPage from "./pages/ReportsPage";
+import AuditLogsPage from "./pages/AuditLogsPage";
 
 function App() {
   return (
@@ -58,6 +59,15 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/audit-logs"
+          element={
+            <ProtectedRoute>
+              <AuditLogsPage />
+            </ProtectedRoute>
+          }
+        />
+
         {/* Catch-all route for undefined paths */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
