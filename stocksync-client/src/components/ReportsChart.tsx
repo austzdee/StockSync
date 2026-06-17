@@ -7,6 +7,8 @@ interface ReportsChartProps {
 }
 
 const ReportsChart = ({ title, data }: ReportsChartProps) => {
+  const maxValue = Math.max(...data.map((item) => item.value), 1);
+
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-900 p-6">
       <h2 className="mb-4 text-lg font-semibold text-white">{title}</h2>
@@ -23,7 +25,7 @@ const ReportsChart = ({ title, data }: ReportsChartProps) => {
               <div
                 className="h-2 rounded-full bg-amber-500"
                 style={{
-                  width: `${Math.min(item.value, 100)}%`,
+                  width: `${(item.value / maxValue) * 100}%`,
                 }}
               />
             </div>

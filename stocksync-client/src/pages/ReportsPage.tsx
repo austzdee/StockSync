@@ -38,40 +38,40 @@ const ReportsPage = () => {
 
   const totalAvailableUnits = stockItems.reduce(
     (sum, item) => sum + item.quantityAvailable,
-    0
+    0,
   );
 
   const totalReservedUnits = stockItems.reduce(
     (sum, item) => sum + item.quantityReserved,
-    0
+    0,
   );
 
   const totalInventoryUnits = stockItems.reduce(
     (sum, item) => sum + item.totalQuantity,
-    0
+    0,
   );
 
   const lowStockItems = stockItems.filter((item) => item.totalQuantity < 10);
 
- const inventoryByProduct = Object.values(
-  stockItems.reduce<Record<string, { name: string; value: number }>>(
-    (result, item) => {
-      const productName = item.productName;
+  const inventoryByProduct = Object.values(
+    stockItems.reduce<Record<string, { name: string; value: number }>>(
+      (result, item) => {
+        const productName = item.productName;
 
-      if (!result[productName]) {
-        result[productName] = {
-          name: productName,
-          value: 0,
-        };
-      }
+        if (!result[productName]) {
+          result[productName] = {
+            name: productName,
+            value: 0,
+          };
+        }
 
-      result[productName].value += item.totalQuantity;
+        result[productName].value += item.totalQuantity;
 
-      return result;
-    },
-    {}
-  )
-);
+        return result;
+      },
+      {},
+    ),
+  );
 
   const inventoryByWarehouse = warehouses.map((warehouse) => {
     const warehouseStock = stockItems
@@ -119,6 +119,11 @@ const ReportsPage = () => {
     return "Healthy";
   };
 
+  const handleExportCsv = () => {
+    // generate CSV
+    // download file
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-8">
@@ -132,7 +137,10 @@ const ReportsPage = () => {
           </div>
 
           <div className="flex gap-3">
-            <button className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800">
+            <button
+              onClick={handleExportCsv}
+              className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800"
+            >
               Export CSV
             </button>
 
@@ -207,7 +215,7 @@ const ReportsPage = () => {
                   <td className="px-6 py-4">
                     <span
                       className={`rounded-full border px-3 py-1 text-xs font-semibold ${getActionBadgeClass(
-                        log.action
+                        log.action,
                       )}`}
                     >
                       {log.action}
@@ -271,9 +279,7 @@ const ReportsPage = () => {
                     key={`${item.productId}-${item.warehouseId}`}
                     className="border-t border-slate-800"
                   >
-                    <td className="px-6 py-4 text-white">
-                      {item.productName}
-                    </td>
+                    <td className="px-6 py-4 text-white">{item.productName}</td>
 
                     <td className="px-6 py-4 text-slate-300">
                       {item.warehouseName}
