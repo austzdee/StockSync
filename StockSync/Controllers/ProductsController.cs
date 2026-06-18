@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Authorization;
 namespace StockSync.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/[controller]")]
 public class ProductsController : ControllerBase
 {
