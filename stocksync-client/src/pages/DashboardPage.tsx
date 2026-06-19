@@ -4,25 +4,30 @@ import DashboardLayout from "../layouts/DashboardLayout";
 import { getProducts, type Product } from "../services/productService";
 import { getWarehouses, type Warehouse } from "../services/warehouseService";
 import { getStock, type StockItem } from "../services/stockService";
+import { getAuditLogs, type AuditLog } from "../services/auditService";
 
 const DashboardPage = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const loadDashboardData = async () => {
       try {
-        const [productData, warehouseData, stockData] = await Promise.all([
-          getProducts(),
-          getWarehouses(),
-          getStock(),
-        ]);
+        const [productData, warehouseData, stockData, auditLogData] =
+          await Promise.all([
+            getProducts(),
+            getWarehouses(),
+            getStock(),
+            getAuditLogs(),
+          ]);
 
         setProducts(productData);
         setWarehouses(warehouseData);
         setStockItems(stockData.results);
+        setAuditLogs(auditLogData);
       } catch (error) {
         console.error("Failed to load dashboard data", error);
       } finally {
@@ -35,18 +40,28 @@ const DashboardPage = () => {
 
   const totalAvailableUnits = stockItems.reduce(
     (sum, item) => sum + item.quantityAvailable,
-    0
+    0,
   );
 
   const totalReservedUnits = stockItems.reduce(
     (sum, item) => sum + item.quantityReserved,
-    0
+    0,
   );
 
   const totalInventoryUnits = stockItems.reduce(
     (sum, item) => sum + item.totalQuantity,
-    0
+    0,
   );
+
+  const inventoryValue = stockItems.reduce((total, stockItem) => {
+    const product = products.find(
+      (product) => product.id === stockItem.productId,
+    );
+
+    if (!product) return total;
+
+    return total + product.price * stockItem.quantityAvailable;
+  }, 0);
 
   const lowStockRecords = stockItems.filter((item) => item.totalQuantity < 10);
 
@@ -61,7 +76,7 @@ const DashboardPage = () => {
       : Math.round(
           (stockItems.filter((item) => item.totalQuantity > 0).length /
             warehouses.length) *
-            100
+            100,
         );
 
   const inventoryByCategory = stockItems.reduce<Record<string, number>>(
@@ -69,7 +84,7 @@ const DashboardPage = () => {
       result[item.category] = (result[item.category] ?? 0) + item.totalQuantity;
       return result;
     },
-    {}
+    {},
   );
 
   const inventoryByWarehouse = warehouses.map((warehouse) => {
@@ -84,7 +99,10 @@ const DashboardPage = () => {
   });
 
   const topStockItems = [...stockItems]
-    .sort((firstItem, secondItem) => secondItem.totalQuantity - firstItem.totalQuantity)
+    .sort(
+      (firstItem, secondItem) =>
+        secondItem.totalQuantity - firstItem.totalQuantity,
+    )
     .slice(0, 5);
 
   return (
@@ -145,6 +163,15 @@ const DashboardPage = () => {
               />
 
               <DashboardCard
+                title="Inventory Value"
+                value={`£${inventoryValue.toLocaleString(undefined, {
+                  maximumFractionDigits: 2,
+                })}`}
+                description="Current value of available inventory"
+                tone="success"
+              />
+
+              <DashboardCard
                 title="Low Stock Items"
                 value={lowStockRecords.length}
                 description="Stock records below threshold"
@@ -153,6 +180,39 @@ const DashboardPage = () => {
             </div>
 
             <div className="grid gap-6 xl:grid-cols-3">
+              <AnalyticsPanel
+                title="Recent Activity"
+                description="Latest stock movements across the platform."
+              >
+                <div className="space-y-3">
+                  {auditLogs.length === 0 ? (
+                    <p className="text-sm text-slate-400">
+                      No recent activity found.
+                    </p>
+                  ) : (
+                    auditLogs.slice(0, 5).map((log) => (
+                      <div
+                        key={log.id}
+                        className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-950 px-4 py-3"
+                      >
+                        <div>
+                          <p className="font-medium text-white">{log.action}</p>
+
+                          <p className="text-xs text-slate-500">
+                            Product #{log.productId} • Warehouse #
+                            {log.warehouseId}
+                          </p>
+                        </div>
+
+                        <span className="text-sm font-semibold text-amber-400">
+                          {log.quantityChanged}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </AnalyticsPanel>
+
               <AnalyticsPanel
                 title="Inventory Health"
                 description="Operational overview of current stock performance."
@@ -247,7 +307,7 @@ const DashboardPage = () => {
                   ([name, value]) => ({
                     name,
                     value,
-                  })
+                  }),
                 )}
               />
 
