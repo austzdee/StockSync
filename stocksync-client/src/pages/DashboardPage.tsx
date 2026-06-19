@@ -5,6 +5,7 @@ import { getProducts, type Product } from "../services/productService";
 import { getWarehouses, type Warehouse } from "../services/warehouseService";
 import { getStock, type StockItem } from "../services/stockService";
 import { getAuditLogs, type AuditLog } from "../services/auditService";
+import DashboardCharts from "../components/DashboardCharts";
 
 const DashboardPage = () => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -301,20 +302,15 @@ const DashboardPage = () => {
             </div>
 
             <div className="grid gap-6 xl:grid-cols-2">
-              <SimpleBarChart
-                title="Inventory by Category"
-                data={Object.entries(inventoryByCategory).map(
-                  ([name, value]) => ({
-                    name,
-                    value,
-                  }),
-                )}
-              />
-
-              <SimpleBarChart
-                title="Inventory by Warehouse"
-                data={inventoryByWarehouse}
-              />
+              <DashboardCharts
+  categoryData={Object.entries(inventoryByCategory).map(
+    ([name, value]) => ({
+      name,
+      value,
+    })
+  )}
+  warehouseData={inventoryByWarehouse}
+/>
             </div>
           </>
         )}
@@ -359,46 +355,8 @@ const AnalyticsMetric = ({ label, value }: AnalyticsMetricProps) => {
   );
 };
 
-interface SimpleBarChartProps {
-  title: string;
-  data: {
-    name: string;
-    value: number;
-  }[];
-}
 
-const SimpleBarChart = ({ title, data }: SimpleBarChartProps) => {
-  const maxValue = Math.max(...data.map((item) => item.value), 1);
+  
 
-  return (
-    <section className="rounded-xl border border-slate-800 bg-slate-900 p-6">
-      <h2 className="text-lg font-semibold text-white">{title}</h2>
-
-      <div className="mt-5 space-y-4">
-        {data.length === 0 ? (
-          <p className="text-sm text-slate-400">No chart data available.</p>
-        ) : (
-          data.map((item) => (
-            <div key={item.name}>
-              <div className="mb-2 flex items-center justify-between text-sm">
-                <span className="text-slate-300">{item.name}</span>
-                <span className="font-medium text-white">{item.value}</span>
-              </div>
-
-              <div className="h-2 rounded-full bg-slate-800">
-                <div
-                  className="h-2 rounded-full bg-amber-500"
-                  style={{
-                    width: `${(item.value / maxValue) * 100}%`,
-                  }}
-                />
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-    </section>
-  );
-};
 
 export default DashboardPage;
