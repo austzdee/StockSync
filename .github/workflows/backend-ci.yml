@@ -13,6 +13,19 @@ jobs:
     name: Backend Build and Tests
     runs-on: ubuntu-latest
 
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          SA_PASSWORD: "YourStrong!Passw0rd"
+        ports:
+          - 1433:1433
+
+    env:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: "Server=localhost,1433;Database=StockSyncDb_CI;User Id=sa;Password=YourStrong!Passw0rd;TrustServerCertificate=True"
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -27,6 +40,12 @@ jobs:
 
       - name: Build backend
         run: dotnet build StockSync.slnx --configuration Release --no-restore
+
+      - name: Install EF Core tool
+        run: dotnet tool install --global dotnet-ef
+
+      - name: Apply database migrations
+        run: dotnet ef database update --project StockSync/StockSync.csproj --startup-project StockSync/StockSync.csproj
 
       - name: Run backend tests
         run: dotnet test StockSync.slnx --configuration Release --no-build
