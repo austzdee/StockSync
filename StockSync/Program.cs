@@ -14,7 +14,10 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowReactFrontend", policy =>
     {
         policy
-            .WithOrigins("http://localhost:5173")
+            .WithOrigins(
+    "http://localhost:5173",
+    "https://white-field-06b923110.7.azurestaticapps.net"
+)
             .AllowAnyHeader()
             .AllowAnyMethod();
     });
