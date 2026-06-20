@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 
@@ -6,19 +6,38 @@ interface DashboardLayoutProps {
   children: ReactNode;
 }
 
-const DashboardLayout = ({
-  children,
-}: DashboardLayoutProps) => {
+const DashboardLayout = ({ children }: DashboardLayoutProps) => {
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(false);
+
   return (
-    <div className="flex min-h-screen bg-slate-950">
-      <Sidebar />
+    <div className="min-h-screen bg-slate-950 text-slate-100">
+      {mobileSidebarOpen && (
+        <button
+          type="button"
+          aria-label="Close sidebar overlay"
+          className="fixed inset-0 z-40 bg-black/60 lg:hidden"
+          onClick={() => setMobileSidebarOpen(false)}
+        />
+      )}
 
-      <div className="flex flex-1 flex-col">
-        <Topbar />
+      <Sidebar
+        mobileSidebarOpen={mobileSidebarOpen}
+        desktopSidebarCollapsed={desktopSidebarCollapsed}
+        onCloseMobileSidebar={() => setMobileSidebarOpen(false)}
+        onToggleDesktopSidebar={() =>
+          setDesktopSidebarCollapsed((current) => !current)
+        }
+      />
 
-        <main className="flex-1 p-6">
-          {children}
-        </main>
+      <div
+        className={`flex min-h-screen flex-col transition-all duration-300 ${
+          desktopSidebarCollapsed ? "lg:pl-20" : "lg:pl-64"
+        }`}
+      >
+        <Topbar onOpenMobileSidebar={() => setMobileSidebarOpen(true)} />
+
+        <main className="flex-1 p-4 sm:p-6 lg:p-8">{children}</main>
       </div>
     </div>
   );
