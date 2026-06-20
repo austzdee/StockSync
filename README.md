@@ -1,196 +1,201 @@
-# \# StockSync
+# StockSync
 
-# 
+Enterprise Inventory Management Platform built with ASP.NET Core .NET 10, React, TypeScript, SQL Server, Azure App Service, and Azure SQL Database.
 
-# !\[CI](https://github.com/austzdee/StockSync/actions/workflows/dotnet.yml/badge.svg)
+## Overview
 
-# 
+StockSync is a full-stack inventory management platform designed to help organizations manage products, warehouses, stock allocation, reservations, transfers, reporting, and audit tracking through a modern web interface.
 
-# StockSync is a modern inventory and warehouse stock management API built with ASP.NET Core and Entity Framework Core.
+The platform demonstrates enterprise software engineering practices including authentication, service-layer architecture, REST APIs, inventory workflows, audit logging, reporting dashboards, Azure deployment, and CI/CD automation.
 
-# 
+---
 
-# It demonstrates production-focused backend engineering practices including authentication, authorization, stock transfers, audit logging, automated testing, and CI/CD pipelines.
+## Live Application
 
-# 
+### Frontend
 
-# \---
+Azure Static Web Apps
 
-# 
+### Backend API
 
-# \## Features
+Azure App Service
 
-# 
+### Database
 
-# \- JWT Authentication
+Azure SQL Database
 
-# \- Refresh Token Rotation
+---
 
-# \- Logout / Token Revocation
+## Technology Stack
 
-# \- Role-Based Authorization (Admin/User)
+### Frontend
 
-# \- Product Management
+* React
+* TypeScript
+* Vite
+* Tailwind CSS
+* React Router
+* Axios
 
-# \- Warehouse Management
+### Backend
 
-# \- Stock Assignment
+* ASP.NET Core .NET 10
+* Entity Framework Core
+* SQL Server
+* JWT Authentication
+* REST API Architecture
 
-# \- Stock Transfers Between Warehouses
+### Cloud & DevOps
 
-# \- Audit Logging
+* Azure App Service
+* Azure SQL Database
+* Azure Static Web Apps
+* GitHub Actions
+* Git & GitHub
 
-# \- Soft Delete Support
+---
 
-# \- Pagination \& Filtering
+## Key Features
 
-# \- Integration Testing
+### Authentication
 
-# \- GitHub Actions CI Pipeline
+* JWT-based authentication
+* Protected routes
+* Secure API access
 
-# 
+### Product Management
 
-# \---
+* Create products
+* Update products
+* Delete products
+* Product categorization
+* SKU management
 
-\## Screenshots
+### Warehouse Management
 
+* Create warehouse locations
+* Update warehouse information
+* Delete warehouses
+* Multi-location inventory support
 
+### Stock Operations
 
-\### Swagger API
+* Assign stock
+* Reserve stock
+* Release reservations
+* Transfer stock between warehouses
 
+### Reporting & Analytics
 
+* Inventory summaries
+* Warehouse analytics
+* Product analytics
+* Stock utilization reporting
+* Export capabilities
 
-!\[Swagger](assets/swagger-home.png)
+### Audit Logging
 
+* Inventory activity tracking
+* Historical operation records
+* Transfer history
+* Reservation history
 
+---
 
-\### Authentication
+## Screenshots
 
+### Login
 
+![Login](docs/screenshots/login-page.png)
 
-!\[Auth Login](assets/auth-login.png)
+### Dashboard Overview
 
+![Dashboard Overview](docs/screenshots/dashboard-overview.png)
 
+### Dashboard Analytics
 
-\### Stock Transfer
+![Dashboard Analytics](docs/screenshots/dashboard-charts.png)
 
+### Recent Activity
 
+![Dashboard Activity](docs/screenshots/dashboard-activity.png)
 
-!\[Transfer](assets/stock-transfer.png)
+### Products
 
+![Products](docs/screenshots/products-page.png)
 
+### Warehouses
 
-\### CI Pipeline
+![Warehouses](docs/screenshots/warehouses-page.png)
 
+### Stock Operations
 
+![Stock Operations](docs/screenshots/stock-operations-page.png)
 
-!\[GitHub Actions](assets/github-actions-pass.png)
+### Audit Logs
 
-# \---
+![Audit Logs](docs/screenshots/audit-logs-page.png)
 
-# \## Tech Stack
+### Reports
 
-# 
+![Reports](docs/screenshots/reports-page.png)
 
-# \- ASP.NET Core (.NET 10)
+### Reporting Analytics
 
-# \- Entity Framework Core
+![Reports Analytics](docs/screenshots/reports-analytics.png)
 
-# \- SQL Server / LocalDB
+---
 
-# \- JWT Bearer Authentication
+## Architecture
 
-# \- xUnit Integration Testing
+Frontend (React + TypeScript)
 
-# \- GitHub Actions
+↓
 
-# 
+REST API
 
-# \---
+↓
 
-# 
+ASP.NET Core .NET 10
 
-# \## Example API Endpoints
+↓
 
-# 
+Entity Framework Core
 
-# \### Auth
+↓
 
-# 
+Azure SQL Database
 
-# \- `POST /api/Auth/register`
+---
 
-# \- `POST /api/Auth/login`
+## CI/CD
 
-# \- `POST /api/Auth/refresh`
+GitHub Actions automates:
 
-# \- `POST /api/Auth/logout`
+* Build validation
+* Test execution
+* Deployment workflows
 
-# 
+---
 
-# \### Products
+## Future Enhancements
 
-# 
+* Role-based authorization
+* User administration
+* Inventory forecasting
+* Low-stock notifications
+* Supplier management
+* Purchase orders
+* Dashboard widgets
+* Docker containerization
 
-# \- `GET /api/Products`
+---
 
-# \- `POST /api/Products` \*(Admin only)\*
+## Author
 
-# \- `PUT /api/Products/{id}`
+Daniel Okafor
 
-# \- `DELETE /api/Products/{id}`
+Software Developer
 
-# 
-
-# \### Stock
-
-# 
-
-# \- `POST /api/stock/assign`
-
-# \- `POST /api/stock/transfer`
-
-# 
-
-# \---
-
-# 
-
-# \## Quality Checks
-
-# 
-
-# Automated GitHub Actions workflow runs on every push:
-
-# 
-
-# \- Restore packages
-
-# \- Build solution
-
-# \- Apply database migrations
-
-# \- Run integration tests
-
-# 
-
-# \---
-
-# 
-
-# \## Local Setup
-
-# 
-
-# ```bash
-
-# git clone https://github.com/austzdee/StockSync.git
-
-# cd StockSync
-
-# dotnet restore
-
-# dotnet ef database update
-
-# dotnet run
-
+GitHub:
+https://github.com/austzdee
