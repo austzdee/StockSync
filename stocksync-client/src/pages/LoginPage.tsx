@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { login as loginUser } from "../services/authService";
+import { Link } from "react-router-dom";
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -33,9 +34,7 @@ const LoginPage = () => {
     } catch (error) {
       console.error("Login failed", error);
 
-      setErrorMessage(
-        "Invalid email or password. Please try again."
-      );
+      setErrorMessage("Invalid email or password. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -51,9 +50,7 @@ const LoginPage = () => {
           </span>
         </h1>
 
-        <p className="mt-2 text-slate-400">
-          Sign in to continue
-        </p>
+        <p className="mt-2 text-slate-400">Sign in to continue</p>
 
         {errorMessage && (
           <div className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
@@ -61,10 +58,7 @@ const LoginPage = () => {
           </div>
         )}
 
-        <form
-          onSubmit={handleSubmit}
-          className="mt-6 space-y-4"
-        >
+        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-300">
               Email
@@ -102,6 +96,15 @@ const LoginPage = () => {
           >
             {isLoading ? "Signing In..." : "Sign In"}
           </button>
+          <p className="mt-6 text-center text-sm text-slate-400">
+            Don&apos;t have an account?{" "}
+            <Link
+              to="/register"
+              className="font-semibold text-cyan-400 hover:text-cyan-300"
+            >
+              Create one
+            </Link>
+          </p>
         </form>
       </div>
     </div>

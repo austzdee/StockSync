@@ -7,6 +7,7 @@ import WarehousesPage from "./pages/WarehousesPage";
 import StockTransfersPage from "./pages/StockTransfersPage";
 import ReportsPage from "./pages/ReportsPage";
 import AuditLogsPage from "./pages/AuditLogsPage";
+import RegisterPage from "./pages/RegisterPage";
 
 function App() {
   return (
@@ -66,6 +67,10 @@ function App() {
               <AuditLogsPage />
             </ProtectedRoute>
           }
+        />
+        <Route
+          path="/register"
+          element={<RegisterPage />}
         />
 
         {/* Catch-all route for undefined paths */}
