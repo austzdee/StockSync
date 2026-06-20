@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { login as loginUser } from "../services/authService";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -96,15 +95,6 @@ const LoginPage = () => {
           >
             {isLoading ? "Signing In..." : "Sign In"}
           </button>
-          <p className="mt-6 text-center text-sm text-slate-400">
-            Don&apos;t have an account?{" "}
-            <Link
-              to="/register"
-              className="font-semibold text-cyan-400 hover:text-cyan-300"
-            >
-              Create one
-            </Link>
-          </p>
         </form>
       </div>
     </div>
