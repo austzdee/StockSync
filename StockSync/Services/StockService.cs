@@ -17,10 +17,10 @@ public class StockService : IStockService
     }
 
     // Create a new stock record or update an existing one
-    public async Task<object> AssignStockAsync(AssignStockDto dto)
+    public async Task<StockResponseDto> AssignStockAsync(AssignStockDto dto)
     {
         // Reject negative stock values
-        if (dto.QuantityAvailable < 0 )
+        if (dto.QuantityAvailable < 0)
             throw new InvalidOperationException("Stock values cannot be negative.");
 
         // Confirm product exists and is active
@@ -75,18 +75,19 @@ public class StockService : IStockService
         await _context.SaveChangesAsync();
 
         // Return API-friendly response object
-        return new
+
+        return new StockResponseDto
         {
-            message = "Stock assigned successfully.",
-            stock.ProductId,
-            stock.WarehouseId,
-            stock.QuantityAvailable,
-            stock.QuantityReserved
+            Message = "Stock assigned successfully.",
+            ProductId = stock.ProductId,
+            WarehouseId = stock.WarehouseId,
+            QuantityAvailable = stock.QuantityAvailable,
+            QuantityReserved = stock.QuantityReserved
         };
     }
 
     // Move stock from available to reserved
-    public async Task<object> ReserveStockAsync(ReserveStockDto dto)
+    public async Task<StockResponseDto> ReserveStockAsync(ReserveStockDto dto)
     {
         // Reject invalid quantity
         if (dto.Quantity <= 0)
@@ -122,18 +123,19 @@ public class StockService : IStockService
         await _context.SaveChangesAsync();
 
         // Return API-friendly response object
-        return new
+
+        return new StockResponseDto
         {
-            message = "Stock reserved successfully.",
-            stock.ProductId,
-            stock.WarehouseId,
-            stock.QuantityAvailable,
-            stock.QuantityReserved
+            Message = "Stock reserved successfully.",
+            ProductId = stock.ProductId,
+            WarehouseId = stock.WarehouseId,
+            QuantityAvailable = stock.QuantityAvailable,
+            QuantityReserved = stock.QuantityReserved
         };
     }
 
     // Move stock from reserved back to available
-    public async Task<object> ReleaseStockAsync(ReleaseStockDto dto)
+    public async Task<StockResponseDto> ReleaseStockAsync(ReleaseStockDto dto)
     {
         // Reject invalid quantity
         if (dto.Quantity <= 0)
@@ -169,18 +171,18 @@ public class StockService : IStockService
         await _context.SaveChangesAsync();
 
         // Return API-friendly response object
-        return new
+        return new StockResponseDto
         {
-            message = "Reserved stock released successfully.",
-            stock.ProductId,
-            stock.WarehouseId,
-            stock.QuantityAvailable,
-            stock.QuantityReserved
+            Message = "Reserved stock released successfully.",
+            ProductId = stock.ProductId,
+            WarehouseId = stock.WarehouseId,
+            QuantityAvailable = stock.QuantityAvailable,
+            QuantityReserved = stock.QuantityReserved
         };
     }
 
     // Transfer stock between two warehouses in one transaction
-    public async Task<object> TransferStockAsync(TransferStockDto dto)
+    public async Task<StockTransferResponseDto> TransferStockAsync(TransferStockDto dto)
     {
         // Reject invalid quantity
         if (dto.Quantity <= 0)
@@ -270,15 +272,15 @@ public class StockService : IStockService
             await transaction.CommitAsync();
 
             // Return API-friendly response object
-            return new
+            return new StockTransferResponseDto
             {
-                message = "Stock transferred successfully.",
-                productId = dto.ProductId,
-                fromWarehouseId = dto.FromWarehouseId,
-                toWarehouseId = dto.ToWarehouseId,
-                quantityTransferred = dto.Quantity,
-                sourceQuantityAvailable = sourceStock.QuantityAvailable,
-                destinationQuantityAvailable = destinationStock.QuantityAvailable
+                Message = "Stock transferred successfully.",
+                ProductId = dto.ProductId,
+                FromWarehouseId = dto.FromWarehouseId,
+                ToWarehouseId = dto.ToWarehouseId,
+                QuantityTransferred = dto.Quantity,
+                SourceQuantityAvailable = sourceStock.QuantityAvailable,
+                DestinationQuantityAvailable = destinationStock.QuantityAvailable
             };
         }
         catch
@@ -289,66 +291,70 @@ public class StockService : IStockService
         }
     }
 
-    public async Task<object> GetLowStockAsync()
-{
-    return await _context.Stocks
-        .Include(s => s.Product)
-        .Include(s => s.Warehouse)
-        .Where(s => s.QuantityAvailable + s.QuantityReserved < 10)
-        .Select(s => new
-        {
-            s.ProductId,
-            ProductName = s.Product.Name,
-            s.Product.Sku,
-            s.Product.Category,
-            s.WarehouseId,
-            WarehouseName = s.Warehouse.LocationName,
-            s.QuantityAvailable,
-            s.QuantityReserved,
-            TotalQuantity = s.QuantityAvailable + s.QuantityReserved
-        })
-        .ToListAsync();
-}
-
-public async Task<object> GetAllStockAsync(string? category, int limit, int offset)
-{
-    var query = _context.Stocks
-        .Include(s => s.Product)
-        .Include(s => s.Warehouse)
-        .Where(s => !s.Product.IsDeleted && !s.Warehouse.IsDeleted)
-        .AsQueryable();
-
-    if (!string.IsNullOrWhiteSpace(category))
+   
+ public async Task<IEnumerable<StockListItemDto>> GetLowStockAsync()
     {
-        query = query.Where(s => s.Product.Category == category);
+        return await _context.Stocks
+            .Include(s => s.Product)
+            .Include(s => s.Warehouse)
+            .Where(s => s.QuantityAvailable + s.QuantityReserved < 10)
+            .Select(s => new StockListItemDto
+            {
+                ProductId = s.ProductId,
+                ProductName = s.Product.Name,
+                Sku = s.Product.Sku,
+                Category = s.Product.Category,
+                WarehouseId = s.WarehouseId,
+                WarehouseName = s.Warehouse.LocationName,
+                QuantityAvailable = s.QuantityAvailable,
+                QuantityReserved = s.QuantityReserved,
+                TotalQuantity = s.QuantityAvailable + s.QuantityReserved
+            })
+            .ToListAsync();
     }
 
-    var totalCount = await query.CountAsync();
 
-    var stocks = await query
-        .OrderBy(s => s.Product.Name)
-        .Skip(offset)
-        .Take(limit)
-        .Select(s => new
-        {
-            s.ProductId,
-            ProductName = s.Product.Name,
-            s.Product.Sku,
-            s.Product.Category,
-            s.WarehouseId,
-            WarehouseName = s.Warehouse.LocationName,
-            s.QuantityAvailable,
-            s.QuantityReserved,
-            TotalQuantity = s.QuantityAvailable + s.QuantityReserved
-        })
-        .ToListAsync();
-
-    return new
+    public async Task<StockListResponseDto> GetAllStockAsync(string? category, int limit, int offset)
     {
-        totalCount,
-        limit,
-        offset,
-        results = stocks
-    };
+        var query = _context.Stocks
+            .Include(s => s.Product)
+            .Include(s => s.Warehouse)
+            .Where(s => !s.Product.IsDeleted && !s.Warehouse.IsDeleted)
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(category))
+        {
+            query = query.Where(s => s.Product.Category == category);
+        }
+
+        var totalCount = await query.CountAsync();
+
+        var stocks = await query
+            .OrderBy(s => s.Product.Name)
+            .Skip(offset)
+            .Take(limit)
+            .Select(s => new StockListItemDto
+{
+    ProductId = s.ProductId,
+    ProductName = s.Product.Name,
+    Sku = s.Product.Sku,
+    Category = s.Product.Category,
+    WarehouseId = s.WarehouseId,
+    WarehouseName = s.Warehouse.LocationName,
+    QuantityAvailable = s.QuantityAvailable,
+    QuantityReserved = s.QuantityReserved,
+    TotalQuantity = s.QuantityAvailable + s.QuantityReserved
+})
+            .ToListAsync();
+
+        return new StockListResponseDto
+        {
+            TotalCount = totalCount,
+            Limit = limit,
+            Offset = offset,
+            Results = stocks
+        };
+    }
 }
-}
+
+    
