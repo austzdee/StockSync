@@ -1,8 +1,14 @@
-﻿namespace StockSync.DTOs
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace StockSync.DTOs;
+
+public class UpdateWarehouseDto
 {
-    public class UpdateWarehouseDto
-    {
-        public string LocationName { get; set; } = string.Empty;
-        public string Address { get; set; }=string.Empty;
-    }
+    [Required]
+    [StringLength(100)]
+    public string LocationName { get; set; } = string.Empty;
+
+    [Required]
+    [StringLength(250)]
+    public string Address { get; set; } = string.Empty;
 }

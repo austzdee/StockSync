@@ -1,10 +1,18 @@
-﻿namespace StockSync.DTOs
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace StockSync.DTOs;
+
+public class TransferStockDto
 {
-    public class TransferStockDto
-    {
-        public int ProductId { get; set; }
-        public int FromWarehouseId { get; set; }
-        public int ToWarehouseId { get; set; }
-        public int Quantity { get; set; }
-    }
+    [Range(1, int.MaxValue)]
+    public int ProductId { get; set; }
+
+    [Range(1, int.MaxValue)]
+    public int FromWarehouseId { get; set; }
+
+    [Range(1, int.MaxValue)]
+    public int ToWarehouseId { get; set; }
+
+    [Range(1, int.MaxValue)]
+    public int Quantity { get; set; }
 }

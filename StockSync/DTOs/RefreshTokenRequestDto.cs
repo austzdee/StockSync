@@ -1,7 +1,10 @@
-﻿namespace StockSync.DTOs
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace StockSync.DTOs;
+
+public class RefreshTokenDto
 {
-    public class RefreshTokenDto
-    {
-        public string RefreshToken { get; set; } = string.Empty;
-    }
+    [Required]
+    [StringLength(500)]
+    public string RefreshToken { get; set; } = string.Empty;
 }

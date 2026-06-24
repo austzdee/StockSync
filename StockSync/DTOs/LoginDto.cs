@@ -1,8 +1,15 @@
-﻿namespace StockSync.DTOs
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace StockSync.DTOs;
+
+public class LoginDto
 {
-    public class LoginDto
-    {
-        public string Email { get; set; }= string.Empty;
-        public string Password { get; set; } = string.Empty;
-    }
+    [Required]
+    [EmailAddress]
+    [StringLength(255)]
+    public string Email { get; set; } = string.Empty;
+
+    [Required]
+    [StringLength(100)]
+    public string Password { get; set; } = string.Empty;
 }

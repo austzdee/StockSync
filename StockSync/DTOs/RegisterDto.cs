@@ -1,9 +1,23 @@
-﻿namespace StockSync.DTOs
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace StockSync.DTOs;
+
+public class RegisterDto
 {
-    public class RegisterDto
-    {
-        public string FullName { get; set; } = string.Empty;
-        public string Email { get; set; }= string.Empty;
-        public string Password { get; set; } = string.Empty;
-    }
+    [Required]
+    [StringLength(100)]
+    public string FullName { get; set; } = string.Empty;
+
+    [Required]
+    [EmailAddress]
+    [StringLength(255)]
+    public string Email { get; set; } = string.Empty;
+
+    [Required]
+    [MinLength(8)]
+    [StringLength(100)]
+    [RegularExpression(
+        @"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$",
+        ErrorMessage = "Password must contain at least one uppercase letter, one lowercase letter, and one number.")]
+    public string Password { get; set; } = string.Empty;
 }
