@@ -1,7 +1,5 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using StockSync.Data;
 using StockSync.DTOs;
 using StockSync.Interfaces;
 
@@ -12,19 +10,17 @@ namespace StockSync.Controllers;
 [Route("api/[controller]")]
 public class StockController : ControllerBase
 {
-    private readonly AppDbContext _context;
+   
     private readonly IStockService _stockService;
     private readonly IAuditLogService _auditLogService;
 
-    public StockController(
-        AppDbContext context,
-        IStockService stockService,
-        IAuditLogService auditLogService)
-    {
-        _context = context;
-        _stockService = stockService;
-        _auditLogService = auditLogService;
-    }
+public StockController(
+    IStockService stockService,
+    IAuditLogService auditLogService)
+{
+    _stockService = stockService;
+    _auditLogService = auditLogService;
+}
 
     [HttpPost("assign")]
     public async Task<IActionResult> AssignStock(AssignStockDto dto)
@@ -106,79 +102,29 @@ public class StockController : ControllerBase
         return Ok(logs);
     }
 
+    
     [HttpGet("low-stock")]
-    public async Task<IActionResult> GetLowStock()
-    {
-        var lowStockItems = await _context.Stocks
-            .Include(s => s.Product)
-            .Include(s => s.Warehouse)
-            .Where(s => s.QuantityAvailable + s.QuantityReserved < 10)
-            .Select(s => new
-            {
-                s.ProductId,
-                ProductName = s.Product.Name,
-                s.Product.Sku,
-                s.Product.Category,
-                s.WarehouseId,
-                WarehouseName = s.Warehouse.LocationName,
-                s.QuantityAvailable,
-                s.QuantityReserved,
-                TotalQuantity = s.QuantityAvailable + s.QuantityReserved
-            })
-            .ToListAsync();
+public async Task<IActionResult> GetLowStock()
+{
+    var lowStockItems = await _stockService.GetLowStockAsync();
 
-        return Ok(lowStockItems);
-    }
+    return Ok(lowStockItems);
+}
 
     [HttpGet]
-    public async Task<IActionResult> GetAll(
-        [FromQuery] string? category,
-        [FromQuery] int limit = 10,
-        [FromQuery] int offset = 0)
-    {
-        if (limit <= 0)
-            return BadRequest(new { message = "Limit must be greater than zero." });
+public async Task<IActionResult> GetAll(
+    [FromQuery] string? category,
+    [FromQuery] int limit = 10,
+    [FromQuery] int offset = 0)
+{
+    if (limit <= 0)
+        return BadRequest(new { message = "Limit must be greater than zero." });
 
-        if (offset < 0)
-            return BadRequest(new { message = "Offset cannot be negative." });
+    if (offset < 0)
+        return BadRequest(new { message = "Offset cannot be negative." });
 
-        var query = _context.Stocks
-            .Include(s => s.Product)
-            .Include(s => s.Warehouse)
-            .Where(s => !s.Product.IsDeleted && !s.Warehouse.IsDeleted)
-            .AsQueryable();
+    var stocks = await _stockService.GetAllStockAsync(category, limit, offset);
 
-        if (!string.IsNullOrWhiteSpace(category))
-        {
-            query = query.Where(s => s.Product.Category == category);
-        }
-
-        var totalCount = await query.CountAsync();
-
-        var stocks = await query
-            .OrderBy(s => s.Product.Name)
-            .Skip(offset)
-            .Take(limit)
-            .Select(s => new
-            {
-                s.ProductId,
-                ProductName = s.Product.Name,
-                s.Product.Sku,
-                s.Product.Category,
-                s.WarehouseId,
-                WarehouseName = s.Warehouse.LocationName,
-                s.QuantityAvailable,
-                s.QuantityReserved,
-                TotalQuantity = s.QuantityAvailable + s.QuantityReserved
-            })
-            .ToListAsync();
-
-        return Ok(new
-        {
-            totalCount,
-            limit,
-            offset,
-            results = stocks
-        });
-    }
+    return Ok(stocks);
+}
 }

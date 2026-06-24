@@ -288,4 +288,67 @@ public class StockService : IStockService
             throw;
         }
     }
+
+    public async Task<object> GetLowStockAsync()
+{
+    return await _context.Stocks
+        .Include(s => s.Product)
+        .Include(s => s.Warehouse)
+        .Where(s => s.QuantityAvailable + s.QuantityReserved < 10)
+        .Select(s => new
+        {
+            s.ProductId,
+            ProductName = s.Product.Name,
+            s.Product.Sku,
+            s.Product.Category,
+            s.WarehouseId,
+            WarehouseName = s.Warehouse.LocationName,
+            s.QuantityAvailable,
+            s.QuantityReserved,
+            TotalQuantity = s.QuantityAvailable + s.QuantityReserved
+        })
+        .ToListAsync();
+}
+
+public async Task<object> GetAllStockAsync(string? category, int limit, int offset)
+{
+    var query = _context.Stocks
+        .Include(s => s.Product)
+        .Include(s => s.Warehouse)
+        .Where(s => !s.Product.IsDeleted && !s.Warehouse.IsDeleted)
+        .AsQueryable();
+
+    if (!string.IsNullOrWhiteSpace(category))
+    {
+        query = query.Where(s => s.Product.Category == category);
+    }
+
+    var totalCount = await query.CountAsync();
+
+    var stocks = await query
+        .OrderBy(s => s.Product.Name)
+        .Skip(offset)
+        .Take(limit)
+        .Select(s => new
+        {
+            s.ProductId,
+            ProductName = s.Product.Name,
+            s.Product.Sku,
+            s.Product.Category,
+            s.WarehouseId,
+            WarehouseName = s.Warehouse.LocationName,
+            s.QuantityAvailable,
+            s.QuantityReserved,
+            TotalQuantity = s.QuantityAvailable + s.QuantityReserved
+        })
+        .ToListAsync();
+
+    return new
+    {
+        totalCount,
+        limit,
+        offset,
+        results = stocks
+    };
+}
 }
