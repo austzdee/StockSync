@@ -1,9 +1,9 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using StockSync.Data;
 using StockSync.DTOs;
 using StockSync.Interfaces;
-using Microsoft.AspNetCore.Authorization;
 
 namespace StockSync.Controllers;
 
@@ -14,15 +14,18 @@ public class StockController : ControllerBase
 {
     private readonly AppDbContext _context;
     private readonly IStockService _stockService;
+    private readonly IAuditLogService _auditLogService;
 
-    // Inject database context and stock service
-    public StockController(AppDbContext context, IStockService stockService)
+    public StockController(
+        AppDbContext context,
+        IStockService stockService,
+        IAuditLogService auditLogService)
     {
         _context = context;
         _stockService = stockService;
+        _auditLogService = auditLogService;
     }
 
-    // Create or update stock for a product in a warehouse
     [HttpPost("assign")]
     public async Task<IActionResult> AssignStock(AssignStockDto dto)
     {
@@ -41,7 +44,6 @@ public class StockController : ControllerBase
         }
     }
 
-    // Reserve stock for a product in a warehouse
     [HttpPost("reserve")]
     public async Task<IActionResult> ReserveStock(ReserveStockDto dto)
     {
@@ -60,7 +62,6 @@ public class StockController : ControllerBase
         }
     }
 
-    // Release reserved stock back to available stock
     [HttpPost("release")]
     public async Task<IActionResult> ReleaseStock(ReleaseStockDto dto)
     {
@@ -79,7 +80,6 @@ public class StockController : ControllerBase
         }
     }
 
-    // Transfer stock from one warehouse to another
     [HttpPost("transfer")]
     public async Task<IActionResult> TransferStock(TransferStockDto dto)
     {
@@ -98,18 +98,14 @@ public class StockController : ControllerBase
         }
     }
 
-    // Get audit log history
     [HttpGet("audit-logs")]
     public async Task<IActionResult> GetAuditLogs()
     {
-        var logs = await _context.AuditLogs
-            .OrderByDescending(a => a.CreatedAtUtc)
-            .ToListAsync();
+       var logs = await _auditLogService.GetAllAsync();
 
         return Ok(logs);
     }
 
-    // Get low stock records where total stock is less than 10
     [HttpGet("low-stock")]
     public async Task<IActionResult> GetLowStock()
     {
@@ -134,7 +130,6 @@ public class StockController : ControllerBase
         return Ok(lowStockItems);
     }
 
-    // Get all stock records with optional category filter and pagination
     [HttpGet]
     public async Task<IActionResult> GetAll(
         [FromQuery] string? category,
