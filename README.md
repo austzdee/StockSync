@@ -1,6 +1,16 @@
 # StockSync
 
-Enterprise Inventory Management Platform built with ASP.NET Core .NET 10, React, TypeScript, SQL Server, Azure App Service, and Azure SQL Database.
+### Enterprise Inventory Management Platform
+
+Full-stack inventory management system built with ASP.NET Core .NET 10, React, TypeScript, SQL Server, Azure App Service, and Azure SQL Database.
+
+![.NET](https://img.shields.io/badge/.NET-10-blue)
+![React](https://img.shields.io/badge/React-TypeScript-61DAFB)
+![Azure](https://img.shields.io/badge/Azure-Deployed-0078D4)
+![SQL Server](https://img.shields.io/badge/SQL_Server-Database-red)
+![Status](https://img.shields.io/badge/Status-Production_Ready-success)
+
+---
 
 ## Overview
 
@@ -10,19 +20,24 @@ The platform demonstrates enterprise software engineering practices including au
 
 ---
 
-## Live Application
+### Live Application
 
 ### Frontend
 
-Azure Static Web Apps
+https://white-field-06b923110.7.azurestaticapps.net
 
 ### Backend API
 
-Azure App Service
+https://stocksync-api-daniel-ababatgbdbenezfx.centralus-01.azurewebsites.net
 
 ### Database
 
 Azure SQL Database
+
+### Source Code
+
+https://github.com/austzdee/StockSync
+
 
 ---
 
