@@ -31,7 +31,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 builder.Services.AddScoped<IStockService, StockService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
-
+builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
