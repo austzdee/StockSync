@@ -37,6 +37,7 @@ public class WarehousesController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<WarehouseResponseDto>> Create(CreateWarehouseDto dto)
     {
         var warehouse = await _warehouseService.CreateAsync(dto);
@@ -45,6 +46,7 @@ public class WarehousesController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Update(int id, UpdateWarehouseDto dto)
     {
         try
@@ -60,6 +62,7 @@ public class WarehousesController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Delete(int id)
     {
         try

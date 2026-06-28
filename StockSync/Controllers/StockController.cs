@@ -10,19 +10,19 @@ namespace StockSync.Controllers;
 [Route("api/[controller]")]
 public class StockController : ControllerBase
 {
-   
     private readonly IStockService _stockService;
     private readonly IAuditLogService _auditLogService;
 
-public StockController(
-    IStockService stockService,
-    IAuditLogService auditLogService)
-{
-    _stockService = stockService;
-    _auditLogService = auditLogService;
-}
+    public StockController(
+        IStockService stockService,
+        IAuditLogService auditLogService)
+    {
+        _stockService = stockService;
+        _auditLogService = auditLogService;
+    }
 
     [HttpPost("assign")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> AssignStock(AssignStockDto dto)
     {
         try
@@ -41,6 +41,7 @@ public StockController(
     }
 
     [HttpPost("reserve")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> ReserveStock(ReserveStockDto dto)
     {
         try
@@ -59,6 +60,7 @@ public StockController(
     }
 
     [HttpPost("release")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> ReleaseStock(ReleaseStockDto dto)
     {
         try
@@ -77,6 +79,7 @@ public StockController(
     }
 
     [HttpPost("transfer")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> TransferStock(TransferStockDto dto)
     {
         try
@@ -97,34 +100,33 @@ public StockController(
     [HttpGet("audit-logs")]
     public async Task<IActionResult> GetAuditLogs()
     {
-       var logs = await _auditLogService.GetAllAsync();
+        var logs = await _auditLogService.GetAllAsync();
 
         return Ok(logs);
     }
 
-    
     [HttpGet("low-stock")]
-public async Task<IActionResult> GetLowStock()
-{
-    var lowStockItems = await _stockService.GetLowStockAsync();
+    public async Task<IActionResult> GetLowStock()
+    {
+        var lowStockItems = await _stockService.GetLowStockAsync();
 
-    return Ok(lowStockItems);
-}
+        return Ok(lowStockItems);
+    }
 
     [HttpGet]
-public async Task<IActionResult> GetAll(
-    [FromQuery] string? category,
-    [FromQuery] int limit = 10,
-    [FromQuery] int offset = 0)
-{
-    if (limit <= 0)
-        return BadRequest(new { message = "Limit must be greater than zero." });
+    public async Task<IActionResult> GetAll(
+        [FromQuery] string? category,
+        [FromQuery] int limit = 10,
+        [FromQuery] int offset = 0)
+    {
+        if (limit <= 0)
+            return BadRequest(new { message = "Limit must be greater than zero." });
 
-    if (offset < 0)
-        return BadRequest(new { message = "Offset cannot be negative." });
+        if (offset < 0)
+            return BadRequest(new { message = "Offset cannot be negative." });
 
-    var stocks = await _stockService.GetAllStockAsync(category, limit, offset);
+        var stocks = await _stockService.GetAllStockAsync(category, limit, offset);
 
-    return Ok(stocks);
-}
+        return Ok(stocks);
+    }
 }
