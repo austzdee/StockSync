@@ -16,20 +16,33 @@ public class WarehouseService : IWarehouseService
         _context = context;
     }
 
-    public async Task<IEnumerable<Warehouse>> GetAllAsync()
+    public async Task<IEnumerable<WarehouseResponseDto>> GetAllAsync()
     {
         return await _context.Warehouses
             .Where(w => !w.IsDeleted)
+            .Select(w => new WarehouseResponseDto
+            {
+                Id = w.Id,
+                LocationName = w.LocationName,
+                Address = w.Address
+            })
             .ToListAsync();
     }
 
-    public async Task<Warehouse?> GetByIdAsync(int id)
+    public async Task<WarehouseResponseDto?> GetByIdAsync(int id)
     {
         return await _context.Warehouses
-            .FirstOrDefaultAsync(w => w.Id == id && !w.IsDeleted);
+            .Where(w => w.Id == id && !w.IsDeleted)
+            .Select(w => new WarehouseResponseDto
+            {
+                Id = w.Id,
+                LocationName = w.LocationName,
+                Address = w.Address
+            })
+            .FirstOrDefaultAsync();
     }
 
-    public async Task<Warehouse> CreateAsync(CreateWarehouseDto dto)
+    public async Task<WarehouseResponseDto> CreateAsync(CreateWarehouseDto dto)
     {
         var warehouse = new Warehouse
         {
@@ -40,10 +53,15 @@ public class WarehouseService : IWarehouseService
         _context.Warehouses.Add(warehouse);
         await _context.SaveChangesAsync();
 
-        return warehouse;
+        return new WarehouseResponseDto
+        {
+            Id = warehouse.Id,
+            LocationName = warehouse.LocationName,
+            Address = warehouse.Address
+        };
     }
 
-    public async Task<Warehouse> UpdateAsync(int id, UpdateWarehouseDto dto)
+    public async Task<WarehouseResponseDto> UpdateAsync(int id, UpdateWarehouseDto dto)
     {
         var warehouse = await _context.Warehouses
             .FirstOrDefaultAsync(w => w.Id == id && !w.IsDeleted);
@@ -56,7 +74,12 @@ public class WarehouseService : IWarehouseService
 
         await _context.SaveChangesAsync();
 
-        return warehouse;
+        return new WarehouseResponseDto
+        {
+            Id = warehouse.Id,
+            LocationName = warehouse.LocationName,
+            Address = warehouse.Address
+        };
     }
 
     public async Task DeleteAsync(int id)
