@@ -71,7 +71,7 @@ public class AuthController : ControllerBase
         var token = GenerateJwtToken(user);
         var refreshToken = GenerateRefreshToken();
 
-        user.RefreshToken = refreshToken;
+        user.RefreshToken = HashRefreshToken(refreshToken);
         user.RefreshTokenExpiresAtUtc = DateTime.UtcNow.AddDays(7);
 
         await _context.SaveChangesAsync();
@@ -94,8 +94,10 @@ public class AuthController : ControllerBase
     [HttpPost("refresh")]
     public async Task<IActionResult> RefreshToken(RefreshTokenDto dto)
     {
+        var refreshTokenHash = HashRefreshToken(dto.RefreshToken);
+
         var user = await _context.AppUsers
-            .FirstOrDefaultAsync(u => u.RefreshToken == dto.RefreshToken);
+            .FirstOrDefaultAsync(u => u.RefreshToken == refreshTokenHash);
 
         if (user is null || user.RefreshTokenExpiresAtUtc < DateTime.UtcNow)
             return Unauthorized(new { message = "Invalid or expired refresh token." });
@@ -103,7 +105,7 @@ public class AuthController : ControllerBase
         var token = GenerateJwtToken(user);
         var refreshToken = GenerateRefreshToken();
 
-        user.RefreshToken = refreshToken;
+        user.RefreshToken = HashRefreshToken(refreshToken);
         user.RefreshTokenExpiresAtUtc = DateTime.UtcNow.AddDays(7);
 
         await _context.SaveChangesAsync();
@@ -119,8 +121,10 @@ public class AuthController : ControllerBase
     [HttpPost("logout")]
     public async Task<IActionResult> Logout(RefreshTokenDto dto)
     {
+        var refreshTokenHash = HashRefreshToken(dto.RefreshToken);
+
         var user = await _context.AppUsers
-            .FirstOrDefaultAsync(u => u.RefreshToken == dto.RefreshToken);
+            .FirstOrDefaultAsync(u => u.RefreshToken == refreshTokenHash);
 
         if (user is null)
             return Unauthorized(new { message = "Invalid refresh token." });
@@ -169,5 +173,13 @@ public class AuthController : ControllerBase
         rng.GetBytes(randomBytes);
 
         return Convert.ToBase64String(randomBytes);
+    }
+
+    private static string HashRefreshToken(string refreshToken)
+    {
+        var tokenBytes = Encoding.UTF8.GetBytes(refreshToken);
+        var hashBytes = SHA256.HashData(tokenBytes);
+
+        return Convert.ToBase64String(hashBytes);
     }
 }
