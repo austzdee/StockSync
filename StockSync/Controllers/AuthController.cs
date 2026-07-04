@@ -17,11 +17,16 @@ public class AuthController : ControllerBase
 {
     private readonly AppDbContext _context;
     private readonly IConfiguration _configuration;
+    private readonly ILogger<AuthController> _logger;
 
-    public AuthController(AppDbContext context, IConfiguration configuration)
+    public AuthController(
+        AppDbContext context,
+        IConfiguration configuration,
+        ILogger<AuthController> logger)
     {
         _context = context;
         _configuration = configuration;
+        _logger = logger;
     }
 
     [HttpPost("register")]
@@ -57,16 +62,24 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> Login(LoginDto dto)
     {
+        _logger.LogInformation("Login attempt for email: {Email}", dto.Email);
+
         var user = await _context.AppUsers
             .FirstOrDefaultAsync(u => u.Email == dto.Email);
 
         if (user is null)
+        {
+            _logger.LogWarning("Login failed. User not found for email: {Email}", dto.Email);
             return Unauthorized(new { message = "Invalid email or password." });
+        }
 
         var passwordValid = BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash);
 
         if (!passwordValid)
+        {
+            _logger.LogWarning("Login failed. Invalid password for email: {Email}", dto.Email);
             return Unauthorized(new { message = "Invalid email or password." });
+        }
 
         var token = GenerateJwtToken(user);
         var refreshToken = GenerateRefreshToken();
@@ -75,6 +88,8 @@ public class AuthController : ControllerBase
         user.RefreshTokenExpiresAtUtc = DateTime.UtcNow.AddDays(7);
 
         await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Login successful for user ID: {UserId}", user.Id);
 
         return Ok(new
         {
