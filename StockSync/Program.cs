@@ -58,6 +58,7 @@ builder.Services.AddScoped<IStockService, StockService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<IWarehouseService, WarehouseService>();
+builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -94,8 +95,6 @@ using (var scope = app.Services.CreateScope())
             logger.LogInformation(
                 "Database migrations applied successfully.");
         }
-
-        logger.LogInformation("Database migrations applied successfully.");
     }
     catch (Exception ex)
     {
