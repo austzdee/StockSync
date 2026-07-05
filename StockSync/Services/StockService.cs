@@ -10,34 +10,29 @@ public class StockService : IStockService
 {
     private readonly AppDbContext _context;
 
-    // Inject database context
     public StockService(AppDbContext context)
     {
         _context = context;
     }
 
-    // Create a new stock record or update an existing one
     public async Task<StockResponseDto> AssignStockAsync(AssignStockDto dto)
     {
-        // Reject negative stock values
         if (dto.QuantityAvailable < 0)
             throw new InvalidOperationException("Stock values cannot be negative.");
 
-        // Confirm product exists and is active
+        // Stock can only be assigned to active inventory dimensions.
         var productExists = await _context.Products
             .AnyAsync(p => p.Id == dto.ProductId && !p.IsDeleted);
 
         if (!productExists)
             throw new KeyNotFoundException("Product not found.");
 
-        // Confirm warehouse exists and is active
         var warehouseExists = await _context.Warehouses
             .AnyAsync(w => w.Id == dto.WarehouseId && !w.IsDeleted);
 
         if (!warehouseExists)
             throw new KeyNotFoundException("Warehouse not found.");
 
-        // Check if stock row already exists for this product and warehouse
         var stock = await _context.Stocks
             .FirstOrDefaultAsync(s =>
                 s.ProductId == dto.ProductId &&
@@ -45,7 +40,6 @@ public class StockService : IStockService
 
         if (stock is null)
         {
-            // Create a new stock row
             stock = new Stock
             {
                 ProductId = dto.ProductId,
@@ -58,11 +52,10 @@ public class StockService : IStockService
         }
         else
         {
-            // Update only available stock
             stock.QuantityAvailable += dto.QuantityAvailable;
         }
 
-        // Record stock assignment in audit log
+        // Audit logs provide the inventory movement history used by reporting.
         _context.AuditLogs.Add(new AuditLog
         {
             ProductId = stock.ProductId,
@@ -74,8 +67,6 @@ public class StockService : IStockService
 
         await _context.SaveChangesAsync();
 
-        // Return API-friendly response object
-
         return new StockResponseDto
         {
             Message = "Stock assigned successfully.",
@@ -86,14 +77,11 @@ public class StockService : IStockService
         };
     }
 
-    // Move stock from available to reserved
     public async Task<StockResponseDto> ReserveStockAsync(ReserveStockDto dto)
     {
-        // Reject invalid quantity
         if (dto.Quantity <= 0)
             throw new InvalidOperationException("Quantity must be greater than zero.");
 
-        // Find matching stock row
         var stock = await _context.Stocks
             .FirstOrDefaultAsync(s =>
                 s.ProductId == dto.ProductId &&
@@ -102,15 +90,13 @@ public class StockService : IStockService
         if (stock is null)
             throw new KeyNotFoundException("Stock record not found.");
 
-        // Prevent reserving more than available
         if (stock.QuantityAvailable < dto.Quantity)
             throw new InvalidOperationException("Not enough available stock to reserve.");
 
-        // Update stock values
+        // Reservation keeps total inventory unchanged while making the quantity unavailable for sale.
         stock.QuantityAvailable -= dto.Quantity;
         stock.QuantityReserved += dto.Quantity;
 
-        // Record reservation in audit log
         _context.AuditLogs.Add(new AuditLog
         {
             ProductId = stock.ProductId,
@@ -122,8 +108,6 @@ public class StockService : IStockService
 
         await _context.SaveChangesAsync();
 
-        // Return API-friendly response object
-
         return new StockResponseDto
         {
             Message = "Stock reserved successfully.",
@@ -134,14 +118,11 @@ public class StockService : IStockService
         };
     }
 
-    // Move stock from reserved back to available
     public async Task<StockResponseDto> ReleaseStockAsync(ReleaseStockDto dto)
     {
-        // Reject invalid quantity
         if (dto.Quantity <= 0)
             throw new InvalidOperationException("Quantity must be greater than zero.");
 
-        // Find matching stock row
         var stock = await _context.Stocks
             .FirstOrDefaultAsync(s =>
                 s.ProductId == dto.ProductId &&
@@ -150,15 +131,13 @@ public class StockService : IStockService
         if (stock is null)
             throw new KeyNotFoundException("Stock record not found.");
 
-        // Prevent releasing more than reserved
         if (stock.QuantityReserved < dto.Quantity)
             throw new InvalidOperationException("Not enough reserved stock to release.");
 
-        // Update stock values
+        // Releasing reverses a reservation without changing total inventory.
         stock.QuantityReserved -= dto.Quantity;
         stock.QuantityAvailable += dto.Quantity;
 
-        // Record release in audit log
         _context.AuditLogs.Add(new AuditLog
         {
             ProductId = stock.ProductId,
@@ -170,7 +149,6 @@ public class StockService : IStockService
 
         await _context.SaveChangesAsync();
 
-        // Return API-friendly response object
         return new StockResponseDto
         {
             Message = "Reserved stock released successfully.",
@@ -181,37 +159,32 @@ public class StockService : IStockService
         };
     }
 
-    // Transfer stock between two warehouses in one transaction
     public async Task<StockTransferResponseDto> TransferStockAsync(TransferStockDto dto)
     {
-        // Reject invalid quantity
         if (dto.Quantity <= 0)
             throw new InvalidOperationException("Quantity must be greater than zero.");
 
-        // Prevent transfer to the same warehouse
         if (dto.FromWarehouseId == dto.ToWarehouseId)
             throw new InvalidOperationException("Source and destination warehouses must be different.");
 
-        // Confirm source warehouse exists and is active
+        // Validate both warehouses before opening the transaction to keep the locked work short.
         var sourceWarehouseExists = await _context.Warehouses
             .AnyAsync(w => w.Id == dto.FromWarehouseId && !w.IsDeleted);
 
         if (!sourceWarehouseExists)
             throw new KeyNotFoundException("Source warehouse not found.");
 
-        // Confirm destination warehouse exists and is active
         var destinationWarehouseExists = await _context.Warehouses
             .AnyAsync(w => w.Id == dto.ToWarehouseId && !w.IsDeleted);
 
         if (!destinationWarehouseExists)
             throw new KeyNotFoundException("Destination warehouse not found.");
 
-        // Start database transaction for atomic transfer
+        // Source decrement, destination increment, and audit records must commit atomically.
         await using var transaction = await _context.Database.BeginTransactionAsync();
 
         try
         {
-            // Find source stock row
             var sourceStock = await _context.Stocks
                 .FirstOrDefaultAsync(s =>
                     s.ProductId == dto.ProductId &&
@@ -220,17 +193,14 @@ public class StockService : IStockService
             if (sourceStock is null)
                 throw new KeyNotFoundException("Source stock record not found.");
 
-            // Prevent transfer beyond available stock
             if (sourceStock.QuantityAvailable < dto.Quantity)
                 throw new InvalidOperationException("Not enough available stock in source warehouse.");
 
-            // Find destination stock row
             var destinationStock = await _context.Stocks
                 .FirstOrDefaultAsync(s =>
                     s.ProductId == dto.ProductId &&
                     s.WarehouseId == dto.ToWarehouseId);
 
-            // Create destination stock row if missing
             if (destinationStock is null)
             {
                 destinationStock = new Stock
@@ -244,11 +214,10 @@ public class StockService : IStockService
                 _context.Stocks.Add(destinationStock);
             }
 
-            // Move stock between warehouses
             sourceStock.QuantityAvailable -= dto.Quantity;
             destinationStock.QuantityAvailable += dto.Quantity;
 
-            // Record both sides of the transfer in audit log
+            // Store separate audit rows so each warehouse ledger can be reviewed independently.
             _context.AuditLogs.AddRange(
                 new AuditLog
                 {
@@ -271,7 +240,6 @@ public class StockService : IStockService
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
 
-            // Return API-friendly response object
             return new StockTransferResponseDto
             {
                 Message = "Stock transferred successfully.",
@@ -285,15 +253,14 @@ public class StockService : IStockService
         }
         catch
         {
-            // Roll back if anything fails
             await transaction.RollbackAsync();
             throw;
         }
     }
 
-   
- public async Task<IEnumerable<StockListItemDto>> GetLowStockAsync()
+    public async Task<IEnumerable<StockListItemDto>> GetLowStockAsync()
     {
+        // Low stock is based on total on-hand inventory, including reserved units.
         return await _context.Stocks
             .Include(s => s.Product)
             .Include(s => s.Warehouse)
@@ -312,7 +279,6 @@ public class StockService : IStockService
             })
             .ToListAsync();
     }
-
 
     public async Task<StockListResponseDto> GetAllStockAsync(string? category, int limit, int offset)
     {
@@ -334,17 +300,17 @@ public class StockService : IStockService
             .Skip(offset)
             .Take(limit)
             .Select(s => new StockListItemDto
-{
-    ProductId = s.ProductId,
-    ProductName = s.Product.Name,
-    Sku = s.Product.Sku,
-    Category = s.Product.Category,
-    WarehouseId = s.WarehouseId,
-    WarehouseName = s.Warehouse.LocationName,
-    QuantityAvailable = s.QuantityAvailable,
-    QuantityReserved = s.QuantityReserved,
-    TotalQuantity = s.QuantityAvailable + s.QuantityReserved
-})
+            {
+                ProductId = s.ProductId,
+                ProductName = s.Product.Name,
+                Sku = s.Product.Sku,
+                Category = s.Product.Category,
+                WarehouseId = s.WarehouseId,
+                WarehouseName = s.Warehouse.LocationName,
+                QuantityAvailable = s.QuantityAvailable,
+                QuantityReserved = s.QuantityReserved,
+                TotalQuantity = s.QuantityAvailable + s.QuantityReserved
+            })
             .ToListAsync();
 
         return new StockListResponseDto

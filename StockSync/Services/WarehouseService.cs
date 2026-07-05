@@ -10,7 +10,6 @@ public class WarehouseService : IWarehouseService
 {
     private readonly AppDbContext _context;
 
-    // Inject database context
     public WarehouseService(AppDbContext context)
     {
         _context = context;
@@ -90,6 +89,7 @@ public class WarehouseService : IWarehouseService
         if (warehouse is null)
             throw new KeyNotFoundException("Warehouse not found.");
 
+        // Soft delete keeps stock movement history intact for reporting.
         warehouse.IsDeleted = true;
 
         await _context.SaveChangesAsync();

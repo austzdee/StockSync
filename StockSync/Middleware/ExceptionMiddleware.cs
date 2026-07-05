@@ -9,7 +9,6 @@ public class ExceptionMiddleware
     private readonly RequestDelegate _next;
     private readonly ILogger<ExceptionMiddleware> _logger;
 
-    // Constructor receives next middleware and logger
     public ExceptionMiddleware(
         RequestDelegate next,
         ILogger<ExceptionMiddleware> logger)
@@ -18,20 +17,17 @@ public class ExceptionMiddleware
         _logger = logger;
     }
 
-    // Runs for every request
     public async Task InvokeAsync(HttpContext context)
     {
         try
         {
-            // Continue request pipeline
             await _next(context);
         }
         catch (DbUpdateConcurrencyException ex)
         {
-            // Log concurrency conflict
+            // Concurrency conflicts are expected client-retry cases, not server failures.
             _logger.LogWarning(ex, "Concurrency conflict occurred.");
 
-            // Return clean JSON conflict response
             context.Response.ContentType = "application/json";
             context.Response.StatusCode = (int)HttpStatusCode.Conflict;
 
@@ -46,10 +42,8 @@ public class ExceptionMiddleware
         }
         catch (Exception ex)
         {
-            // Log unexpected error
             _logger.LogError(ex, "Unhandled exception occurred.");
 
-            // Return clean JSON response
             context.Response.ContentType = "application/json";
             context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
 

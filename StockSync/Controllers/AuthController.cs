@@ -84,6 +84,7 @@ public class AuthController : ControllerBase
         var token = GenerateJwtToken(user);
         var refreshToken = GenerateRefreshToken();
 
+        // Store only a hash of the refresh token so leaked database rows cannot be reused directly.
         user.RefreshToken = HashRefreshToken(refreshToken);
         user.RefreshTokenExpiresAtUtc = DateTime.UtcNow.AddDays(7);
 
@@ -120,6 +121,7 @@ public class AuthController : ControllerBase
         var token = GenerateJwtToken(user);
         var refreshToken = GenerateRefreshToken();
 
+        // Rotate refresh tokens on every refresh to limit replay risk.
         user.RefreshToken = HashRefreshToken(refreshToken);
         user.RefreshTokenExpiresAtUtc = DateTime.UtcNow.AddDays(7);
 
@@ -158,6 +160,7 @@ public class AuthController : ControllerBase
         var issuer = _configuration["Jwt:Issuer"];
         var audience = _configuration["Jwt:Audience"];
 
+        // Keep role and identity claims in the token so authorization policies can use them without another lookup.
         var claims = new[]
         {
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
@@ -184,6 +187,7 @@ public class AuthController : ControllerBase
     {
         var randomBytes = new byte[64];
 
+        // Use a cryptographic RNG because refresh tokens are bearer credentials.
         using var rng = RandomNumberGenerator.Create();
         rng.GetBytes(randomBytes);
 

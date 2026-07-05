@@ -113,6 +113,7 @@ public class ProductService : IProductService
         if (product is null)
             throw new KeyNotFoundException("Product not found.");
 
+        // Soft delete preserves historical stock and audit references.
         product.IsDeleted = true;
         await _context.SaveChangesAsync();
     }
