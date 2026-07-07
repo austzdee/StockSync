@@ -44,4 +44,29 @@ public class ReportService : IReportService
                 (s.QuantityAvailable + s.QuantityReserved) * s.Price)
         };
     }
+
+    public async Task<IEnumerable<LowStockReportDto>> GetLowStockReportAsync(int threshold = 10)
+{
+    return await _context.Stocks
+        .Include(s => s.Product)
+        .Include(s => s.Warehouse)
+        .Where(s =>
+            !s.Product.IsDeleted &&
+            !s.Warehouse.IsDeleted &&
+            s.QuantityAvailable + s.QuantityReserved < threshold)
+        .OrderBy(s => s.QuantityAvailable + s.QuantityReserved)
+        .Select(s => new LowStockReportDto
+        {
+            ProductId = s.ProductId,
+            ProductName = s.Product.Name,
+            Sku = s.Product.Sku,
+            Category = s.Product.Category,
+            WarehouseId = s.WarehouseId,
+            WarehouseName = s.Warehouse.LocationName,
+            QuantityAvailable = s.QuantityAvailable,
+            QuantityReserved = s.QuantityReserved,
+            TotalQuantity = s.QuantityAvailable + s.QuantityReserved
+        })
+        .ToListAsync();
+}
 }

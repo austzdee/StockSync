@@ -23,4 +23,16 @@ public class ReportsController : ControllerBase
 
         return Ok(summary);
     }
+
+    [HttpGet("low-stock")]
+public async Task<IActionResult> GetLowStockReport([FromQuery] int threshold = 10)
+{
+    if (threshold <= 0)
+        return BadRequest(new { message = "Threshold must be greater than zero." });
+
+    var report = await _reportService.GetLowStockReportAsync(threshold);
+
+    return Ok(report);
 }
+}
+
