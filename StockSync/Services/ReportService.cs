@@ -45,7 +45,8 @@ public class ReportService : IReportService
         };
     }
 
-    public async Task<IEnumerable<LowStockReportDto>> GetLowStockReportAsync(int threshold = 10)
+public async Task<IEnumerable<LowStockReportDto>> GetLowStockReportAsync(
+    int threshold = 10)
 {
     return await _context.Stocks
         .Include(s => s.Product)
@@ -67,6 +68,38 @@ public class ReportService : IReportService
             QuantityReserved = s.QuantityReserved,
             TotalQuantity = s.QuantityAvailable + s.QuantityReserved
         })
+        .ToListAsync();
+}
+
+public async Task<IEnumerable<WarehouseInventoryValueDto>>
+    GetWarehouseInventoryValueAsync()
+{
+    return await _context.Stocks
+        .Include(s => s.Product)
+        .Include(s => s.Warehouse)
+        .Where(s =>
+            !s.Product.IsDeleted &&
+            !s.Warehouse.IsDeleted)
+        .GroupBy(s => new
+        {
+            s.WarehouseId,
+            s.Warehouse.LocationName
+        })
+        .Select(group => new WarehouseInventoryValueDto
+        {
+            WarehouseId = group.Key.WarehouseId,
+            WarehouseName = group.Key.LocationName,
+            TotalProducts = group
+                .Select(s => s.ProductId)
+                .Distinct()
+                .Count(),
+            TotalUnits = group.Sum(s =>
+                s.QuantityAvailable + s.QuantityReserved),
+            InventoryValue = group.Sum(s =>
+                (s.QuantityAvailable + s.QuantityReserved) *
+                s.Product.Price)
+        })
+        .OrderByDescending(item => item.InventoryValue)
         .ToListAsync();
 }
 }

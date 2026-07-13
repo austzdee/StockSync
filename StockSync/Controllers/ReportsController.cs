@@ -34,5 +34,12 @@ public async Task<IActionResult> GetLowStockReport([FromQuery] int threshold = 1
 
     return Ok(report);
 }
+
+[HttpGet("warehouse-stock-value")]
+public async Task<IActionResult> GetWarehouseInventoryValue()
+{
+    var report = await _reportService.GetWarehouseInventoryValueAsync();
+    return Ok(report);
+}
 }
 
