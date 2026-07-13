@@ -71,6 +71,10 @@ public async Task<IEnumerable<LowStockReportDto>> GetLowStockReportAsync(
         .ToListAsync();
 }
 
+/// <summary>
+/// Generates a warehouse-level inventory valuation report
+/// by aggregating stock quantities and product values.
+/// </summary>
 public async Task<IEnumerable<WarehouseInventoryValueDto>>
     GetWarehouseInventoryValueAsync()
 {
@@ -96,6 +100,7 @@ public async Task<IEnumerable<WarehouseInventoryValueDto>>
             TotalUnits = group.Sum(s =>
                 s.QuantityAvailable + s.QuantityReserved),
             InventoryValue = group.Sum(s =>
+            //total inventory for the warehouse
                 (s.QuantityAvailable + s.QuantityReserved) *
                 s.Product.Price)
         })

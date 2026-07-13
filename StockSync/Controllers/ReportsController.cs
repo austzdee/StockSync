@@ -34,7 +34,9 @@ public async Task<IActionResult> GetLowStockReport([FromQuery] int threshold = 1
 
     return Ok(report);
 }
-
+/// <summary>
+/// Returns inventory valuation grouped by warehouse.
+/// </summary>
 [HttpGet("warehouse-stock-value")]
 public async Task<IActionResult> GetWarehouseInventoryValue()
 {
