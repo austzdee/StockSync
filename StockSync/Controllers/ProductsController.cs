@@ -9,6 +9,7 @@ namespace StockSync.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/[controller]")]
+[Route("api/v1/[controller]")]
 public class ProductsController : ControllerBase
 {
     private readonly IProductService _productService;

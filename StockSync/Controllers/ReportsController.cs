@@ -7,6 +7,7 @@ namespace StockSync.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
+[Route("api/v1/[controller]")]
 public class ReportsController : ControllerBase
 {
     private readonly IReportService _reportService;
