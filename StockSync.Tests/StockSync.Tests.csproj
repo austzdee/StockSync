@@ -24,4 +24,11 @@
     <ProjectReference Include="..\StockSync\StockSync.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+  <!-- Copies the test-specific configuration into the test output directory. -->
+  <None Update="appsettings.Testing.json">
+    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+  </None>
+</ItemGroup>
+
 </Project>
