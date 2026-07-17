@@ -69,6 +69,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
             errorNumbersToAdd: null)));
 builder.Services.AddHealthChecks();
 
+builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IStockService, StockService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<IProductService, ProductService>();
@@ -129,8 +130,12 @@ app.UseSwaggerUI(options =>
         "/swagger/v1/swagger.json",
         "StockSync API v1");
 });
-// Disabled for local React + HTTP API development.
-// app.UseHttpsRedirection();
+
+// Enforces HTTPS for every environment except automated testing.
+if (!app.Environment.IsEnvironment("Testing"))
+{
+    app.UseHttpsRedirection();
+}
 
 
 app.UseCors("AllowReactFrontend");
