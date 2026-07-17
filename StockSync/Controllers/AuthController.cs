@@ -1,205 +1,111 @@
-﻿using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Security.Cryptography;
-using System.Text;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
-using StockSync.Data;
+﻿using Microsoft.AspNetCore.Mvc;
 using StockSync.DTOs;
-using StockSync.Entities;
+using StockSync.Interfaces;
 
 namespace StockSync.Controllers;
 
+/// <summary>
+/// Exposes registration, login, token refresh,
+/// and logout endpoints.
+/// </summary>
 [ApiController]
 [Route("api/[controller]")]
 [Route("api/v1/[controller]")]
 public class AuthController : ControllerBase
 {
-    private readonly AppDbContext _context;
-    private readonly IConfiguration _configuration;
-    private readonly ILogger<AuthController> _logger;
+    private readonly IAuthService _authService;
 
-    public AuthController(
-        AppDbContext context,
-        IConfiguration configuration,
-        ILogger<AuthController> logger)
+    /// <summary>
+    /// Initializes the authentication controller.
+    /// </summary>
+    /// <param name="authService">
+    /// Service responsible for authentication workflows.
+    /// </param>
+    public AuthController(IAuthService authService)
     {
-        _context = context;
-        _configuration = configuration;
-        _logger = logger;
+        _authService = authService;
     }
 
+    /// <summary>
+    /// Registers a new StockSync application user.
+    /// </summary>
     [HttpPost("register")]
     public async Task<IActionResult> Register(RegisterDto dto)
     {
-        var emailExists = await _context.AppUsers
-            .AnyAsync(u => u.Email == dto.Email);
-
-        if (emailExists)
-            return Conflict(new { message = "Email already exists." });
-
-        var user = new AppUser
+        try
         {
-            FullName = dto.FullName,
-            Email = dto.Email,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
-            Role = "User"
-        };
+            var result = await _authService.RegisterAsync(dto);
 
-        _context.AppUsers.Add(user);
-        await _context.SaveChangesAsync();
-
-        return Ok(new
+            return Ok(result);
+        }
+        catch (InvalidOperationException exception)
         {
-            message = "User registered successfully.",
-            user.Id,
-            user.FullName,
-            user.Email,
-            user.Role
-        });
+            return Conflict(new
+            {
+                message = exception.Message
+            });
+        }
     }
 
+    /// <summary>
+    /// Authenticates a user and returns an access token,
+    /// refresh token, and user details.
+    /// </summary>
     [HttpPost("login")]
     public async Task<IActionResult> Login(LoginDto dto)
     {
-        _logger.LogInformation("Login attempt for email: {Email}", dto.Email);
+        var result = await _authService.LoginAsync(dto);
 
-        var user = await _context.AppUsers
-            .FirstOrDefaultAsync(u => u.Email == dto.Email);
-
-        if (user is null)
+        if (result is null)
         {
-            _logger.LogWarning("Login failed. User not found for email: {Email}", dto.Email);
-            return Unauthorized(new { message = "Invalid email or password." });
-        }
-
-        var passwordValid = BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash);
-
-        if (!passwordValid)
-        {
-            _logger.LogWarning("Login failed. Invalid password for email: {Email}", dto.Email);
-            return Unauthorized(new { message = "Invalid email or password." });
-        }
-
-        var token = GenerateJwtToken(user);
-        var refreshToken = GenerateRefreshToken();
-
-        // Store only a hash of the refresh token so leaked database rows cannot be reused directly.
-        user.RefreshToken = HashRefreshToken(refreshToken);
-        user.RefreshTokenExpiresAtUtc = DateTime.UtcNow.AddDays(7);
-
-        await _context.SaveChangesAsync();
-
-        _logger.LogInformation("Login successful for user ID: {UserId}", user.Id);
-
-        return Ok(new
-        {
-            message = "Login successful.",
-            token,
-            refreshToken,
-            user = new
+            return Unauthorized(new
             {
-                user.Id,
-                user.FullName,
-                user.Email,
-                user.Role
-            }
-        });
+                message = "Invalid email or password."
+            });
+        }
+
+        return Ok(result);
     }
 
+    /// <summary>
+    /// Rotates a valid refresh token and issues
+    /// a new access-token and refresh-token pair.
+    /// </summary>
     [HttpPost("refresh")]
     public async Task<IActionResult> RefreshToken(RefreshTokenDto dto)
     {
-        var refreshTokenHash = HashRefreshToken(dto.RefreshToken);
+        var result = await _authService.RefreshTokenAsync(dto);
 
-        var user = await _context.AppUsers
-            .FirstOrDefaultAsync(u => u.RefreshToken == refreshTokenHash);
-
-        if (user is null || user.RefreshTokenExpiresAtUtc < DateTime.UtcNow)
-            return Unauthorized(new { message = "Invalid or expired refresh token." });
-
-        var token = GenerateJwtToken(user);
-        var refreshToken = GenerateRefreshToken();
-
-        // Rotate refresh tokens on every refresh to limit replay risk.
-        user.RefreshToken = HashRefreshToken(refreshToken);
-        user.RefreshTokenExpiresAtUtc = DateTime.UtcNow.AddDays(7);
-
-        await _context.SaveChangesAsync();
-
-        return Ok(new
+        if (result is null)
         {
-            message = "Token refreshed successfully.",
-            token,
-            refreshToken
-        });
+            return Unauthorized(new
+            {
+                message = "Invalid or expired refresh token."
+            });
+        }
+
+        return Ok(result);
     }
 
+    /// <summary>
+    /// Invalidates an active refresh token.
+    /// </summary>
     [HttpPost("logout")]
     public async Task<IActionResult> Logout(RefreshTokenDto dto)
     {
-        var refreshTokenHash = HashRefreshToken(dto.RefreshToken);
+        var loggedOut = await _authService.LogoutAsync(dto);
 
-        var user = await _context.AppUsers
-            .FirstOrDefaultAsync(u => u.RefreshToken == refreshTokenHash);
-
-        if (user is null)
-            return Unauthorized(new { message = "Invalid refresh token." });
-
-        user.RefreshToken = null;
-        user.RefreshTokenExpiresAtUtc = null;
-
-        await _context.SaveChangesAsync();
-
-        return Ok(new { message = "Logout successful." });
-    }
-
-    private string GenerateJwtToken(AppUser user)
-    {
-        var jwtKey = _configuration["Jwt:Key"]!;
-        var issuer = _configuration["Jwt:Issuer"];
-        var audience = _configuration["Jwt:Audience"];
-
-        // Keep role and identity claims in the token so authorization policies can use them without another lookup.
-        var claims = new[]
+        if (!loggedOut)
         {
-            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new Claim(ClaimTypes.Name, user.FullName),
-            new Claim(ClaimTypes.Email, user.Email),
-            new Claim(ClaimTypes.Role, user.Role)
-        };
+            return Unauthorized(new
+            {
+                message = "Invalid refresh token."
+            });
+        }
 
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
-        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-        var token = new JwtSecurityToken(
-            issuer: issuer,
-            audience: audience,
-            claims: claims,
-            expires: DateTime.UtcNow.AddMinutes(60),
-            signingCredentials: credentials
-        );
-
-        return new JwtSecurityTokenHandler().WriteToken(token);
-    }
-
-    private static string GenerateRefreshToken()
-    {
-        var randomBytes = new byte[64];
-
-        // Use a cryptographic RNG because refresh tokens are bearer credentials.
-        using var rng = RandomNumberGenerator.Create();
-        rng.GetBytes(randomBytes);
-
-        return Convert.ToBase64String(randomBytes);
-    }
-
-    private static string HashRefreshToken(string refreshToken)
-    {
-        var tokenBytes = Encoding.UTF8.GetBytes(refreshToken);
-        var hashBytes = SHA256.HashData(tokenBytes);
-
-        return Convert.ToBase64String(hashBytes);
+        return Ok(new
+        {
+            message = "Logout successful."
+        });
     }
 }
