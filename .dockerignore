@@ -1,0 +1,31 @@
+# Git
+.git
+.gitignore
+
+# Visual Studio / .NET
+.vs
+bin/
+obj/
+
+# Rider / VS Code
+.idea
+.vscode
+
+# Node
+node_modules
+npm-debug.log
+
+# Build output
+dist
+build
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.*
+
+# Docker
+docker-compose.override.yml
