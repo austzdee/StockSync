@@ -1,16 +1,92 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi;
+using StockSync.Constants;
 using StockSync.Data;
 using StockSync.Interfaces;
 using StockSync.Middleware;
 using StockSync.Services;
 using System.Text;
-using Microsoft.OpenApi;
+using System.Threading.RateLimiting;
 
 
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddHealthChecks();
+builder.Services.AddRateLimiter(options =>
+{
+    // Returns a consistent response whenever a client exceeds a limit.
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        var retryAfterSeconds = 60;
+
+        if (context.Lease.TryGetMetadata(
+                MetadataName.RetryAfter,
+                out var retryAfter))
+        {
+            retryAfterSeconds = Math.Max(
+                1,
+                (int)Math.Ceiling(retryAfter.TotalSeconds));
+        }
+
+        context.HttpContext.Response.Headers.RetryAfter =
+            retryAfterSeconds.ToString();
+
+        context.HttpContext.Response.ContentType = "application/json";
+
+        await context.HttpContext.Response.WriteAsJsonAsync(
+            new
+            {
+                status = StatusCodes.Status429TooManyRequests,
+                title = "Too Many Requests",
+                message =
+                    "The request limit has been exceeded. Please try again later.",
+                retryAfterSeconds
+            },
+            cancellationToken);
+    };
+
+    options.AddFixedWindowLimiter(
+        RateLimitPolicies.Login,
+        limiterOptions =>
+        {
+            limiterOptions.PermitLimit = 5;
+            limiterOptions.Window = TimeSpan.FromMinutes(1);
+            limiterOptions.QueueLimit = 0;
+            limiterOptions.QueueProcessingOrder =
+                QueueProcessingOrder.OldestFirst;
+            limiterOptions.AutoReplenishment = true;
+        });
+
+    options.AddFixedWindowLimiter(
+        RateLimitPolicies.Register,
+        limiterOptions =>
+        {
+            limiterOptions.PermitLimit = 3;
+            limiterOptions.Window = TimeSpan.FromMinutes(1);
+            limiterOptions.QueueLimit = 0;
+            limiterOptions.QueueProcessingOrder =
+                QueueProcessingOrder.OldestFirst;
+            limiterOptions.AutoReplenishment = true;
+        });
+
+    options.AddFixedWindowLimiter(
+        RateLimitPolicies.GeneralApi,
+        limiterOptions =>
+        {
+            limiterOptions.PermitLimit = 100;
+            limiterOptions.Window = TimeSpan.FromMinutes(1);
+            limiterOptions.QueueLimit = 0;
+            limiterOptions.QueueProcessingOrder =
+                QueueProcessingOrder.OldestFirst;
+            limiterOptions.AutoReplenishment = true;
+        });
+});
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactFrontend", policy =>
@@ -139,11 +215,13 @@ if (!app.Environment.IsEnvironment("Testing"))
 
 
 app.UseCors("AllowReactFrontend");
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapHealthChecks("/health");
 app.MapControllers();
+
 
 app.Run();
 

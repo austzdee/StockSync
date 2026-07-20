@@ -1,4 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using StockSync.Constants;
 using StockSync.DTOs;
 using StockSync.Interfaces;
 
@@ -30,6 +32,7 @@ public class AuthController : ControllerBase
     /// Registers a new StockSync application user.
     /// </summary>
     [HttpPost("register")]
+    [EnableRateLimiting(RateLimitPolicies.Register)]
     public async Task<IActionResult> Register(RegisterDto dto)
     {
         try
@@ -52,6 +55,7 @@ public class AuthController : ControllerBase
     /// refresh token, and user details.
     /// </summary>
     [HttpPost("login")]
+    [EnableRateLimiting(RateLimitPolicies.Login)]
     public async Task<IActionResult> Login(LoginDto dto)
     {
         var result = await _authService.LoginAsync(dto);
@@ -72,6 +76,7 @@ public class AuthController : ControllerBase
     /// a new access-token and refresh-token pair.
     /// </summary>
     [HttpPost("refresh")]
+    
     public async Task<IActionResult> RefreshToken(RefreshTokenDto dto)
     {
         var result = await _authService.RefreshTokenAsync(dto);
