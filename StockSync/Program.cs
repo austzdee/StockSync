@@ -215,7 +215,14 @@ if (!app.Environment.IsEnvironment("Testing"))
 
 
 app.UseCors("AllowReactFrontend");
-app.UseRateLimiter();
+
+// Rate limiting is disabled during automated integration tests.
+// This prevents unrelated tests from sharing rate-limit counters.
+if (!app.Environment.IsEnvironment("Testing"))
+{
+    app.UseRateLimiter();
+}
+
 app.UseAuthentication();
 app.UseAuthorization();
 
