@@ -1,26 +1,28 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import AuditLogsPage from "./pages/AuditLogsPage";
 import DashboardPage from "./pages/DashboardPage";
-import ProtectedRoute from "./routes/ProtectedRoute";
+import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
 import ProductsPage from "./pages/ProductsPage";
-import WarehousesPage from "./pages/WarehousesPage";
-import StockTransfersPage from "./pages/StockTransfersPage";
 import ReportsPage from "./pages/ReportsPage";
-import AuditLogsPage from "./pages/AuditLogsPage";
-
+import StockTransfersPage from "./pages/StockTransfersPage";
+import WarehousesPage from "./pages/WarehousesPage";
+import PublicLayout from "./layouts/PublicLayout";
+import ProtectedRoute from "./routes/ProtectedRoute";
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Redirect root URL to the dashboard page */}
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        {/* Public-facing website routes */}
+        <Route element={<PublicLayout />}>
+          <Route index element={<LandingPage />} />
+        </Route>
 
-        {/* Public routes */}
+        {/* Authentication routes */}
         <Route path="/login" element={<LoginPage />} />
-       
 
-        {/* Protected routes require authentication */}
+        {/* Protected application routes */}
         <Route
           path="/dashboard"
           element={
@@ -29,6 +31,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/products"
           element={
@@ -37,6 +40,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/warehouses"
           element={
@@ -45,6 +49,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/stock-transfers"
           element={
@@ -53,6 +58,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/reports"
           element={
@@ -61,6 +67,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/audit-logs"
           element={
@@ -69,8 +76,9 @@ function App() {
             </ProtectedRoute>
           }
         />
-        {/* Catch-all route for undefined paths */}
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+
+        {/* Unknown public URLs return visitors to the landing page */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );
