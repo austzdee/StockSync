@@ -3,6 +3,14 @@ import axios, { type AxiosError } from "axios";
 const AUTH_TOKEN_KEY = "stocksync_auth_token";
 
 /**
+ * Raised when an authenticated session expires or becomes invalid.
+ *
+ * The authentication provider listens for this event to synchronise
+ * React authentication state before the user is redirected.
+ */
+const SESSION_EXPIRED_EVENT = "stocksync:session-expired";
+
+/**
  * Retrieves the active authentication token.
  *
  * Persistent sessions use localStorage, while temporary
@@ -73,8 +81,9 @@ api.interceptors.request.use(
  *
  * When an existing session becomes invalid, the interceptor:
  * 1. Clears the stored authentication token.
- * 2. Preserves the user's current destination.
- * 3. Redirects the user to the login page.
+ * 2. Synchronises the frontend authentication state.
+ * 3. Preserves the user's current destination.
+ * 4. Redirects the user to the login page.
  */
 api.interceptors.response.use(
   (response) => response,
@@ -94,6 +103,12 @@ api.interceptors.response.use(
       const isAlreadyOnLoginPage = window.location.pathname === "/login";
 
       clearAuthToken();
+
+      /*
+       * Notifies the authentication provider so React state is
+       * synchronised before navigation occurs.
+       */
+      window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT));
 
       if (!isAlreadyOnLoginPage) {
         const returnUrl = encodeURIComponent(currentPath);

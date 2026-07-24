@@ -1,14 +1,27 @@
 import {
   createContext,
+  useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
 
+/* ============================================================
+   Authentication Configuration
+============================================================ */
+
+const AUTH_TOKEN_KEY = "stocksync_auth_token";
+const SESSION_EXPIRED_EVENT = "stocksync:session-expired";
+
+/* ============================================================
+   Types
+============================================================ */
+
 /**
- * Defines the authentication state and actions
- * available throughout the frontend application.
+ * Defines the authentication state and actions available
+ * throughout the frontend application.
  */
 interface AuthContextValue {
   token: string | null;
@@ -24,15 +37,21 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
-const AUTH_TOKEN_KEY = "stocksync_auth_token";
+/* ============================================================
+   Context
+============================================================ */
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+/* ============================================================
+   Storage Helpers
+============================================================ */
+
 /**
- * Retrieves an existing authentication token.
+ * Retrieves the currently stored authentication token.
  *
- * Persistent sessions use localStorage, while temporary
- * browser sessions use sessionStorage.
+ * Persistent sessions use localStorage, while temporary browser
+ * sessions use sessionStorage.
  */
 const getStoredToken = (): string | null => {
   return (
@@ -42,57 +61,98 @@ const getStoredToken = (): string | null => {
 };
 
 /**
- * Provides authentication state across the frontend application.
+ * Removes authentication information from every supported
+ * browser storage location.
+ */
+const clearStoredToken = (): void => {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+  sessionStorage.removeItem(AUTH_TOKEN_KEY);
+};
+
+/* ============================================================
+   Provider
+============================================================ */
+
+/**
+ * Provides authentication state throughout the application.
  *
- * The provider supports persistent sessions through localStorage
- * and temporary sessions through sessionStorage.
+ * The provider supports persistent and temporary sessions and
+ * synchronises React state when the API reports that a session
+ * has expired or become invalid.
  */
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [token, setToken] = useState<string | null>(getStoredToken);
 
   /**
-   * Stores the JWT token using the selected session preference.
+   * Stores a newly issued JWT using the user's selected
+   * session persistence preference.
    *
    * @param newToken - JWT returned by the authentication API.
-   * @param rememberMe - Determines whether the session survives
+   * @param rememberMe - Whether the session should survive
    * browser restarts.
    */
-  const login = (newToken: string, rememberMe = true) => {
-    localStorage.removeItem(AUTH_TOKEN_KEY);
-    sessionStorage.removeItem(AUTH_TOKEN_KEY);
+  const login = useCallback(
+    (newToken: string, rememberMe = true): void => {
+      clearStoredToken();
 
-    if (rememberMe) {
-      localStorage.setItem(AUTH_TOKEN_KEY, newToken);
-    } else {
-      sessionStorage.setItem(AUTH_TOKEN_KEY, newToken);
-    }
+      if (rememberMe) {
+        localStorage.setItem(AUTH_TOKEN_KEY, newToken);
+      } else {
+        sessionStorage.setItem(AUTH_TOKEN_KEY, newToken);
+      }
 
-    setToken(newToken);
-  };
+      setToken(newToken);
+    },
+    [],
+  );
 
   /**
-   * Removes authentication information from all supported
-   * browser storage locations.
+   * Clears the active session from browser storage and
+   * authentication state.
    */
-  const logout = () => {
-    localStorage.removeItem(AUTH_TOKEN_KEY);
-    sessionStorage.removeItem(AUTH_TOKEN_KEY);
-
+  const logout = useCallback((): void => {
+    clearStoredToken();
     setToken(null);
-  };
+  }, []);
 
   /**
-   * Memoises the context value to prevent unnecessary
-   * consumer re-renders.
+   * Synchronises React authentication state when the API client
+   * detects an expired or invalid authenticated session.
+   *
+   * Navigation remains the responsibility of the Axios interceptor,
+   * while this listener ensures context consumers are immediately
+   * updated before the redirect occurs.
    */
-  const value = useMemo(
+  useEffect(() => {
+    const handleSessionExpired = (): void => {
+      logout();
+    };
+
+    window.addEventListener(
+      SESSION_EXPIRED_EVENT,
+      handleSessionExpired,
+    );
+
+    return () => {
+      window.removeEventListener(
+        SESSION_EXPIRED_EVENT,
+        handleSessionExpired,
+      );
+    };
+  }, [logout]);
+
+  /**
+   * Memoises the context value so consumers only re-render when
+   * authentication state or actions change.
+   */
+  const value = useMemo<AuthContextValue>(
     () => ({
       token,
       isAuthenticated: Boolean(token),
       login,
       logout,
     }),
-    [token],
+    [token, login, logout],
   );
 
   return (
@@ -102,13 +162,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   );
 };
 
+/* ============================================================
+   Hook
+============================================================ */
+
 /**
  * Provides safe access to the authentication context.
  *
- * An error is thrown when the hook is used outside
- * the AuthProvider component.
+ * @throws Error when used outside the AuthProvider.
  */
-export const useAuth = () => {
+export const useAuth = (): AuthContextValue => {
   const context = useContext(AuthContext);
 
   if (!context) {
