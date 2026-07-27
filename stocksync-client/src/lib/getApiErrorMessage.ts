@@ -1,0 +1,66 @@
+import axios from "axios";
+
+type ApiErrorResponse = {
+  message?: unknown;
+  detail?: unknown;
+  title?: unknown;
+  errors?: unknown;
+};
+
+/**
+ * Converts an unknown API failure into a safe, user-facing message.
+ *
+ * Supports common ASP.NET Core response formats, including validation
+ * errors and Problem Details responses.
+ */
+export const getApiErrorMessage = (
+  error: unknown,
+  fallbackMessage: string,
+): string => {
+  if (!axios.isAxiosError(error)) {
+    return fallbackMessage;
+  }
+
+  if (!error.response) {
+    return "Unable to connect to the server. Check your connection and try again.";
+  }
+
+  const responseData: unknown = error.response.data;
+
+  if (typeof responseData === "string" && responseData.trim()) {
+    return responseData.trim();
+  }
+
+  if (!responseData || typeof responseData !== "object") {
+    return fallbackMessage;
+  }
+
+  const apiError = responseData as ApiErrorResponse;
+
+  if (apiError.errors && typeof apiError.errors === "object") {
+    const validationMessages = Object.values(apiError.errors)
+      .flatMap((value) => (Array.isArray(value) ? value : []))
+      .filter(
+        (value): value is string =>
+          typeof value === "string" && value.trim().length > 0,
+      );
+
+    if (validationMessages.length > 0) {
+      return validationMessages[0].trim();
+    }
+  }
+
+  if (typeof apiError.message === "string" && apiError.message.trim()) {
+    return apiError.message.trim();
+  }
+
+  if (typeof apiError.detail === "string" && apiError.detail.trim()) {
+    return apiError.detail.trim();
+  }
+
+  if (typeof apiError.title === "string" && apiError.title.trim()) {
+    return apiError.title.trim();
+  }
+
+  return fallbackMessage;
+};
