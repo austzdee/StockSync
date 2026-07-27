@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { getApiErrorMessage } from "../lib/getApiErrorMessage";
 import DashboardLayout from "../layouts/DashboardLayout";
 import {
   createProduct,
@@ -11,7 +13,7 @@ import {
 
 const ProductsPage = () => {
   // ID of the product currently being edited; null means create mode.
-  const [editingProductId, setEditingProductId] = useState<number | null>(null);
+  const [editingProductId , setEditingProductId] = useState<number | null>(null);
 
   // Product list loaded from the API and shown in the table.
   const [products, setProducts] = useState<Product[]>([]);
@@ -23,7 +25,9 @@ const ProductsPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Indicates which product is currently being deleted.
-  const [deletingProductId, setDeletingProductId] = useState<number | null>(null);
+  const [deletingProductId, setDeletingProductId] = useState<number | null>(
+    null,
+  );
 
   // Form state used for both create and edit operations.
   const [formData, setFormData] = useState<CreateProductRequest>({
@@ -35,13 +39,33 @@ const ProductsPage = () => {
 
   /**
    * Loads product records from the backend API.
+   *
+   * When manually refreshed after another operation, the function can
+   * suppress duplicate error notifications and allow the calling action
+   * to control the user-feedback flow.
    */
-  const loadProducts = async () => {
+  const loadProducts = async (
+    showErrorNotification = true,
+  ): Promise<boolean> => {
+    setIsLoading(true);
+
     try {
       const data = await getProducts();
       setProducts(data);
+      return true;
     } catch (error) {
       console.error("Failed to load products", error);
+
+      if (showErrorNotification) {
+        toast.error(
+          getApiErrorMessage(
+            error,
+            "Unable to load products. Please try again.",
+          ),
+        );
+      }
+
+      return false;
     } finally {
       setIsLoading(false);
     }
@@ -65,21 +89,32 @@ const ProductsPage = () => {
   }, []);
 
   /**
-   * Creates a new product or updates an existing product, then refreshes the table.
+   * Creates a new product or updates an existing product.
+   *
+   * The form remains disabled while the request is running to prevent
+   * accidental duplicate submissions.
    */
-  const handleCreateProduct = async (event: React.FormEvent) => {
+  const handleProductSubmit = async (
+    event: React.FormEvent<HTMLFormElement>,
+  ) => {
     event.preventDefault();
+
+    if (isSubmitting || deletingProductId !== null) {
+      return;
+    }
+
+    const isEditing = editingProductId !== null;
 
     setIsSubmitting(true);
 
     try {
-      if (editingProductId) {
+      if (isEditing) {
         await updateProduct(editingProductId, formData);
       } else {
         await createProduct(formData);
       }
 
-      await loadProducts();
+      const productsRefreshed = await loadProducts(false);
 
       setFormData({
         name: "",
@@ -89,16 +124,45 @@ const ProductsPage = () => {
       });
 
       setEditingProductId(null);
+
+      if (productsRefreshed) {
+        toast.success(
+          isEditing
+            ? "Product updated successfully."
+            : "Product created successfully.",
+        );
+      } else {
+        toast.error(
+          isEditing
+            ? "Product was updated, but the product list could not be refreshed."
+            : "Product was created, but the product list could not be refreshed.",
+        );
+      }
     } catch (error) {
       console.error("Failed to save product", error);
+
+      toast.error(
+        getApiErrorMessage(
+          error,
+          isEditing
+            ? "Unable to update the product. Please try again."
+            : "Unable to create the product. Please try again.",
+        ),
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  /**
+   * Deletes a product after receiving confirmation from the user.
+   */
   const handleDeleteProduct = async (productId: number) => {
-    // Confirm deletion before calling the API.
-    if (!window.confirm("Delete this product?")) {
+    if (deletingProductId !== null || isSubmitting) {
+      return;
+    }
+
+    if (!window.confirm("Delete this product? This action cannot be undone.")) {
       return;
     }
 
@@ -106,9 +170,25 @@ const ProductsPage = () => {
 
     try {
       await deleteProduct(productId);
-      await loadProducts();
+
+      const productsRefreshed = await loadProducts(false);
+
+      if (productsRefreshed) {
+        toast.success("Product deleted successfully.");
+      } else {
+        toast.error(
+          "Product was deleted, but the product list could not be refreshed.",
+        );
+      }
     } catch (error) {
       console.error("Failed to delete product", error);
+
+      toast.error(
+        getApiErrorMessage(
+          error,
+          "Unable to delete the product. It may still be linked to stock records.",
+        ),
+      );
     } finally {
       setDeletingProductId(null);
     }
@@ -123,7 +203,7 @@ const ProductsPage = () => {
 
         {/* Create product form */}
         <form
-          onSubmit={handleCreateProduct}
+          onSubmit={handleProductSubmit}
           className="mt-8 grid grid-cols-1 gap-4 rounded-xl border border-slate-800 bg-slate-900 p-6 md:grid-cols-4"
         >
           <input
@@ -177,17 +257,17 @@ const ProductsPage = () => {
 
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || deletingProductId !== null}
             className="rounded-lg bg-cyan-500 px-4 py-3 font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60 md:col-span-4"
           >
             {isSubmitting
-              ? editingProductId
+               ? editingProductId !== null
                 ? "Updating Product..."
                 : "Creating Product..."
-              : editingProductId
+              : editingProductId !== null
                 ? "Update Product"
                 : "Add Product"}
-          </button>               
+          </button>
         </form>
 
         {/* Products table container */}
@@ -197,9 +277,26 @@ const ProductsPage = () => {
           </div>
 
           {isLoading ? (
-            <p className="p-6 text-slate-400">Loading products...</p>
+            <div
+              className="flex items-center gap-3 p-6 text-slate-400"
+              role="status"
+              aria-live="polite"
+            >
+              <span
+                className="h-5 w-5 animate-spin rounded-full border-2 border-slate-600 border-t-cyan-400"
+                aria-hidden="true"
+              />
+              <span>Loading products...</span>
+            </div>
           ) : products.length === 0 ? (
-            <p className="p-6 text-slate-400">No products found.</p>
+            <div className="p-8 text-center">
+              <h3 className="font-semibold text-white">
+                No products available
+              </h3>
+              <p className="mt-2 text-sm text-slate-400">
+                Add your first product using the form above.
+              </p>
+            </div>
           ) : (
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-950 text-slate-400">
@@ -228,17 +325,20 @@ const ProductsPage = () => {
                       <button
                         type="button"
                         onClick={() => handleEditClick(product)}
-                        className="rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-slate-950 transition hover:bg-amber-400"
+                        disabled={isSubmitting || deletingProductId !== null}
+                        className="rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-slate-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         Edit
                       </button>
                       <button
                         type="button"
                         onClick={() => handleDeleteProduct(product.id)}
-                        disabled={deletingProductId === product.id}
+                        disabled={deletingProductId !== null || isSubmitting}
                         className="rounded-lg bg-rose-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-400 disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        {deletingProductId === product.id ? "Deleting..." : "Delete"}
+                        {deletingProductId === product.id
+                          ? "Deleting..."
+                          : "Delete"}
                       </button>
                     </td>
                   </tr>
