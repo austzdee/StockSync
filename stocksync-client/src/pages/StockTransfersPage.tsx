@@ -1,7 +1,37 @@
-import { useEffect, useState } from "react";
-import DashboardLayout from "../layouts/DashboardLayout";
-import { getProducts, type Product } from "../services/productService";
-import { getWarehouses, type Warehouse } from "../services/warehouseService";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
+import { toast } from "sonner";
+
+import EmptyState from "@/components/feedback/EmptyState";
+import LoadingState from "@/components/feedback/LoadingState";
+import PageHeader from "@/components/shared/PageHeader";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FormField } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
+import {
+  type AssignStockFormErrors,
+  type AssignStockFormValues,
+  type ReleaseStockFormErrors,
+  type ReleaseStockFormValues,
+  type ReserveStockFormErrors,
+  type ReserveStockFormValues,
+  type TransferStockFormErrors,
+  type TransferStockFormValues,
+  validateAssignStockForm,
+  validateReleaseStockForm,
+  validateReserveStockForm,
+  validateTransferStockForm,
+} from "@/lib/stockValidation";
+import DashboardLayout from "@/layouts/DashboardLayout";
+import { getProducts, type Product } from "@/services/productService";
 import {
   assignStock,
   getStock,
@@ -13,65 +43,99 @@ import {
   type ReserveStockRequest,
   type StockItem,
   type TransferStockRequest,
-} from "../services/stockService";
+} from "@/services/stockService";
+import { getWarehouses, type Warehouse } from "@/services/warehouseService";
+
+type PendingOperation = "assign" | "reserve" | "release" | "transfer" | null;
+
+const emptyAssignValues: AssignStockFormValues = {
+  productId: "",
+  warehouseId: "",
+  quantityAvailable: "",
+};
+
+const emptyReserveValues: ReserveStockFormValues = {
+  productId: "",
+  warehouseId: "",
+  quantity: "",
+};
+
+const emptyReleaseValues: ReleaseStockFormValues = {
+  productId: "",
+  warehouseId: "",
+  quantity: "",
+};
+
+const emptyTransferValues: TransferStockFormValues = {
+  productId: "",
+  fromWarehouseId: "",
+  toWarehouseId: "",
+  quantity: "",
+};
 
 /**
  * Stock Operations page.
- * Provides inventory workflows for assigning and reserving stock.
+ * Provides accessible workflows for assigning, reserving,
+ * releasing and transferring inventory.
  */
 const StockTransfersPage = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
-  const [isAssigning, setIsAssigning] = useState(false);
-  const [isReleasing, setIsReleasing] = useState(false);
-  const [isReserving, setIsReserving] = useState(false);
-  const [isTransferring, setIsTransferring] = useState(false);
+
+  const [assignData, setAssignData] =
+    useState<AssignStockFormValues>(emptyAssignValues);
+
+  const [reserveData, setReserveData] =
+    useState<ReserveStockFormValues>(emptyReserveValues);
+
+  const [releaseData, setReleaseData] =
+    useState<ReleaseStockFormValues>(emptyReleaseValues);
+
+  const [transferData, setTransferData] =
+    useState<TransferStockFormValues>(emptyTransferValues);
+
+  const [assignErrors, setAssignErrors] = useState<AssignStockFormErrors>({});
+
+  const [reserveErrors, setReserveErrors] = useState<ReserveStockFormErrors>(
+    {},
+  );
+
+  const [releaseErrors, setReleaseErrors] = useState<ReleaseStockFormErrors>(
+    {},
+  );
+
+  const [transferErrors, setTransferErrors] = useState<TransferStockFormErrors>(
+    {},
+  );
+
   const [isLoading, setIsLoading] = useState(true);
 
-  /**
-   * Form state used when assigning stock to a warehouse.
+  const [pendingOperation, setPendingOperation] =
+    useState<PendingOperation>(null);
+
+  /*
+   * The synchronous lock prevents two form submissions from starting
+   * before React has applied the pending-operation state update.
    */
-  const [formData, setFormData] = useState<AssignStockRequest>({
-    productId: 0,
-    warehouseId: 0,
-    quantityAvailable: 0,
-  });
+  const operationLockRef = useRef(false);
+
+  const isOperationPending = pendingOperation !== null;
+
+  const areFormsDisabled =
+    isLoading ||
+    isOperationPending ||
+    products.length === 0 ||
+    warehouses.length === 0;
 
   /**
-   * Form state used when reserving stock from available inventory.
+   * Loads and sorts the product, warehouse and stock data used by the page.
    */
-  const [reserveData, setReserveData] = useState<ReserveStockRequest>({
-    productId: 0,
-    warehouseId: 0,
-    quantity: 0,
-  });
+  const loadStockPageData = async (
+    showErrorNotification = true,
+  ): Promise<boolean> => {
+    setIsLoading(true);
 
-  /**
-   * Stores release stock form values.
-   */
-
-  const [releaseData, setReleaseData] = useState<ReleaseStockRequest>({
-    productId: 0,
-    warehouseId: 0,
-    quantity: 0,
-  });
-
-  /**
-   * Transfer stock request payload.
-   * Moves stock from one warehouse to another.
-   */
-  const [transferData, setTransferData] = useState<TransferStockRequest>({
-    productId: 0,
-    fromWarehouseId: 0,
-    toWarehouseId: 0,
-    quantity: 0,
-  });
-
-  /**
-   * Loads products, warehouses, and stock records required by the page.
-   */
-  const loadStockPageData = async () => {
     try {
       const [productData, warehouseData, stockData] = await Promise.all([
         getProducts(),
@@ -79,469 +143,1055 @@ const StockTransfersPage = () => {
         getStock(),
       ]);
 
-      setProducts(productData);
-      setWarehouses(warehouseData);
-      setStockItems(stockData.results);
+      const sortedProducts = [...productData].sort((first, second) => {
+        const nameComparison = first.name.localeCompare(second.name, "en-GB", {
+          sensitivity: "base",
+        });
+
+        if (nameComparison !== 0) {
+          return nameComparison;
+        }
+
+        return first.sku.localeCompare(second.sku, "en-GB", {
+          sensitivity: "base",
+        });
+      });
+
+      const sortedWarehouses = [...warehouseData].sort((first, second) => {
+        const locationComparison = first.locationName.localeCompare(
+          second.locationName,
+          "en-GB",
+          {
+            sensitivity: "base",
+          },
+        );
+
+        if (locationComparison !== 0) {
+          return locationComparison;
+        }
+
+        return first.address.localeCompare(second.address, "en-GB", {
+          sensitivity: "base",
+        });
+      });
+
+      const sortedStockItems = [...stockData.results].sort((first, second) => {
+        const productComparison = first.productName.localeCompare(
+          second.productName,
+          "en-GB",
+          {
+            sensitivity: "base",
+          },
+        );
+
+        if (productComparison !== 0) {
+          return productComparison;
+        }
+
+        return first.warehouseName.localeCompare(
+          second.warehouseName,
+          "en-GB",
+          {
+            sensitivity: "base",
+          },
+        );
+      });
+
+      setProducts(sortedProducts);
+      setWarehouses(sortedWarehouses);
+      setStockItems(sortedStockItems);
+
+      return true;
     } catch (error) {
       console.error("Failed to load stock page data", error);
+
+      if (showErrorNotification) {
+        toast.error(
+          getApiErrorMessage(
+            error,
+            "Unable to load stock operations data. Please try again.",
+          ),
+        );
+      }
+
+      return false;
     } finally {
       setIsLoading(false);
     }
   };
 
-  /**
-   * Assigns stock quantity to a selected product and warehouse.
-   */
-  const handleAssignStock = async (event: React.FormEvent) => {
-    event.preventDefault();
-
-    setIsAssigning(true);
-
-    try {
-      await assignStock(formData);
-      await loadStockPageData();
-
-      setFormData({
-        productId: 0,
-        warehouseId: 0,
-        quantityAvailable: 0,
-      });
-    } catch (error) {
-      console.error("Failed to assign stock", error);
-    } finally {
-      setIsAssigning(false);
-    }
-  };
-
-  /**
-   * Reserves stock quantity from available stock.
-   */
-  const handleReserveStock = async (event: React.FormEvent) => {
-    event.preventDefault();
-
-    setIsReserving(true);
-
-    try {
-      await reserveStock(reserveData);
-      await loadStockPageData();
-
-      setReserveData({
-        productId: 0,
-        warehouseId: 0,
-        quantity: 0,
-      });
-    } catch (error) {
-      console.error("Failed to reserve stock", error);
-    } finally {
-      setIsReserving(false);
-    }
-  };
-
-  /**
-   * Releases reserved stock back into available stock.
-   */
-  const handleReleaseStock = async (event: React.FormEvent) => {
-    event.preventDefault();
-
-    setIsReleasing(true);
-
-    try {
-      await releaseStock(releaseData);
-      await loadStockPageData();
-
-      setReleaseData({
-        productId: 0,
-        warehouseId: 0,
-        quantity: 0,
-      });
-    } catch (error) {
-      console.error("Failed to release stock", error);
-    } finally {
-      setIsReleasing(false);
-    }
-  };
-
-  /**
-   * Transfers stock from one warehouse to another.
-   */
-  const handleTransferStock = async (event: React.FormEvent) => {
-    event.preventDefault();
-
-    setIsTransferring(true);
-
-    try {
-      await transferStock(transferData);
-      await loadStockPageData();
-
-      setTransferData({
-        productId: 0,
-        fromWarehouseId: 0,
-        toWarehouseId: 0,
-        quantity: 0,
-      });
-    } catch (error) {
-      console.error("Failed to transfer stock", error);
-    } finally {
-      setIsTransferring(false);
-    }
-  };
-
-  /**
-   * Loads stock operation data when the page first renders.
-   */
   useEffect(() => {
     loadStockPageData();
   }, []);
 
+  /**
+   * Starts one stock mutation and blocks concurrent submissions.
+   */
+  const beginOperation = (
+    operation: Exclude<PendingOperation, null>,
+  ): boolean => {
+    if (operationLockRef.current) {
+      return false;
+    }
+
+    operationLockRef.current = true;
+    setPendingOperation(operation);
+
+    return true;
+  };
+
+  /**
+   * Releases the shared stock-operation submission lock.
+   */
+  const finishOperation = () => {
+    operationLockRef.current = false;
+    setPendingOperation(null);
+  };
+
+  /**
+   * Moves keyboard focus to the first field containing a validation error.
+   */
+  const focusFirstInvalidField = (formPrefix: string, errors: object) => {
+    const firstInvalidField = Object.keys(errors)[0];
+
+    if (firstInvalidField) {
+      document.getElementById(`${formPrefix}-${firstInvalidField}`)?.focus();
+    }
+  };
+
+  /**
+   * Updates an assignment field and clears its existing validation error.
+   */
+  const handleAssignChange =
+    (field: keyof AssignStockFormValues) =>
+    (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+      const value = event.target.value;
+
+      setAssignData((current) => ({
+        ...current,
+        [field]: value,
+      }));
+
+      setAssignErrors((current) => {
+        if (!current[field]) {
+          return current;
+        }
+
+        const updatedErrors = { ...current };
+        delete updatedErrors[field];
+
+        return updatedErrors;
+      });
+    };
+
+  /**
+   * Updates a reservation field and clears its existing validation error.
+   */
+  const handleReserveChange =
+    (field: keyof ReserveStockFormValues) =>
+    (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+      const value = event.target.value;
+
+      setReserveData((current) => ({
+        ...current,
+        [field]: value,
+      }));
+
+      setReserveErrors((current) => {
+        const updatedErrors = { ...current };
+
+        delete updatedErrors[field];
+
+        if (field === "productId" || field === "warehouseId") {
+          delete updatedErrors.quantity;
+        }
+
+        return updatedErrors;
+      });
+    };
+
+  /**
+   * Updates a release field and clears its existing validation error.
+   */
+  const handleReleaseChange =
+    (field: keyof ReleaseStockFormValues) =>
+    (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+      const value = event.target.value;
+
+      setReleaseData((current) => ({
+        ...current,
+        [field]: value,
+      }));
+
+      setReleaseErrors((current) => {
+        const updatedErrors = { ...current };
+
+        delete updatedErrors[field];
+
+        if (field === "productId" || field === "warehouseId") {
+          delete updatedErrors.quantity;
+        }
+
+        return updatedErrors;
+      });
+    };
+
+  /**
+   * Updates a transfer field and clears its existing validation error.
+   */
+  const handleTransferChange =
+    (field: keyof TransferStockFormValues) =>
+    (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+      const value = event.target.value;
+
+      setTransferData((current) => ({
+        ...current,
+        [field]: value,
+      }));
+
+      setTransferErrors((current) => {
+        const updatedErrors = { ...current };
+
+        delete updatedErrors[field];
+
+        if (field === "productId" || field === "fromWarehouseId") {
+          delete updatedErrors.quantity;
+        }
+
+        if (field === "fromWarehouseId") {
+          delete updatedErrors.toWarehouseId;
+        }
+
+        return updatedErrors;
+      });
+    };
+
+  /**
+   * Assigns new available stock to a product and warehouse.
+   */
+  const handleAssignStock = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const validationErrors = validateAssignStockForm(assignData);
+
+    if (Object.keys(validationErrors).length > 0) {
+      setAssignErrors(validationErrors);
+      focusFirstInvalidField("assign", validationErrors);
+
+      return;
+    }
+
+    if (!beginOperation("assign")) {
+      return;
+    }
+
+    const payload: AssignStockRequest = {
+      productId: Number(assignData.productId),
+      warehouseId: Number(assignData.warehouseId),
+      quantityAvailable: Number(assignData.quantityAvailable),
+    };
+
+    try {
+      await assignStock(payload);
+
+      const stockRefreshed = await loadStockPageData(false);
+
+      setAssignData(emptyAssignValues);
+      setAssignErrors({});
+
+      if (stockRefreshed) {
+        toast.success("Stock assigned successfully.");
+      } else {
+        toast.error(
+          "Stock was assigned, but the stock records could not be refreshed.",
+        );
+      }
+    } catch (error) {
+      console.error("Failed to assign stock", error);
+
+      toast.error(
+        getApiErrorMessage(error, "Unable to assign stock. Please try again."),
+      );
+    } finally {
+      finishOperation();
+    }
+  };
+
+  /**
+   * Reserves units from currently available stock.
+   */
+  const handleReserveStock = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const validationErrors = validateReserveStockForm(reserveData, stockItems);
+
+    if (Object.keys(validationErrors).length > 0) {
+      setReserveErrors(validationErrors);
+      focusFirstInvalidField("reserve", validationErrors);
+
+      return;
+    }
+
+    if (!beginOperation("reserve")) {
+      return;
+    }
+
+    const payload: ReserveStockRequest = {
+      productId: Number(reserveData.productId),
+      warehouseId: Number(reserveData.warehouseId),
+      quantity: Number(reserveData.quantity),
+    };
+
+    try {
+      await reserveStock(payload);
+
+      const stockRefreshed = await loadStockPageData(false);
+
+      setReserveData(emptyReserveValues);
+      setReserveErrors({});
+
+      if (stockRefreshed) {
+        toast.success("Stock reserved successfully.");
+      } else {
+        toast.error(
+          "Stock was reserved, but the stock records could not be refreshed.",
+        );
+      }
+    } catch (error) {
+      console.error("Failed to reserve stock", error);
+
+      toast.error(
+        getApiErrorMessage(error, "Unable to reserve stock. Please try again."),
+      );
+    } finally {
+      finishOperation();
+    }
+  };
+
+  /**
+   * Releases reserved units back into available stock.
+   */
+  const handleReleaseStock = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const validationErrors = validateReleaseStockForm(releaseData, stockItems);
+
+    if (Object.keys(validationErrors).length > 0) {
+      setReleaseErrors(validationErrors);
+      focusFirstInvalidField("release", validationErrors);
+
+      return;
+    }
+
+    if (!beginOperation("release")) {
+      return;
+    }
+
+    const payload: ReleaseStockRequest = {
+      productId: Number(releaseData.productId),
+      warehouseId: Number(releaseData.warehouseId),
+      quantity: Number(releaseData.quantity),
+    };
+
+    try {
+      await releaseStock(payload);
+
+      const stockRefreshed = await loadStockPageData(false);
+
+      setReleaseData(emptyReleaseValues);
+      setReleaseErrors({});
+
+      if (stockRefreshed) {
+        toast.success("Reserved stock released successfully.");
+      } else {
+        toast.error(
+          "Reserved stock was released, but the records could not be refreshed.",
+        );
+      }
+    } catch (error) {
+      console.error("Failed to release stock", error);
+
+      toast.error(
+        getApiErrorMessage(
+          error,
+          "Unable to release reserved stock. Please try again.",
+        ),
+      );
+    } finally {
+      finishOperation();
+    }
+  };
+
+  /**
+   * Transfers available stock between two warehouse locations.
+   */
+  const handleTransferStock = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const validationErrors = validateTransferStockForm(
+      transferData,
+      stockItems,
+    );
+
+    if (Object.keys(validationErrors).length > 0) {
+      setTransferErrors(validationErrors);
+      focusFirstInvalidField("transfer", validationErrors);
+
+      return;
+    }
+
+    if (!beginOperation("transfer")) {
+      return;
+    }
+
+    const payload: TransferStockRequest = {
+      productId: Number(transferData.productId),
+      fromWarehouseId: Number(transferData.fromWarehouseId),
+      toWarehouseId: Number(transferData.toWarehouseId),
+      quantity: Number(transferData.quantity),
+    };
+
+    try {
+      await transferStock(payload);
+
+      const stockRefreshed = await loadStockPageData(false);
+
+      setTransferData(emptyTransferValues);
+      setTransferErrors({});
+
+      if (stockRefreshed) {
+        toast.success("Stock transferred successfully.");
+      } else {
+        toast.error(
+          "Stock was transferred, but the stock records could not be refreshed.",
+        );
+      }
+    } catch (error) {
+      console.error("Failed to transfer stock", error);
+
+      toast.error(
+        getApiErrorMessage(
+          error,
+          "Unable to transfer stock. Please try again.",
+        ),
+      );
+    } finally {
+      finishOperation();
+    }
+  };
+
   return (
     <DashboardLayout>
-      <div>
-        <h1 className="text-3xl font-bold text-white">Stock Operations</h1>
+      <div className="space-y-8">
+        <PageHeader
+          title="Stock Operations"
+          description="Assign, reserve, release and transfer inventory between warehouse locations."
+        />
 
-        <p className="mt-2 text-slate-400">
-          Manage stock assignment, reservations and transfers.
-        </p>
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Assign stock</CardTitle>
 
-        {/* Assign Stock Form */}
-        <form
-          onSubmit={handleAssignStock}
-          className="mt-8 grid grid-cols-1 gap-4 rounded-xl border border-slate-800 bg-slate-900 p-6 md:grid-cols-4"
-        >
-          <select
-            value={formData.productId}
-            onChange={(event) =>
-              setFormData({
-                ...formData,
-                productId: Number(event.target.value),
-              })
-            }
-            className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white outline-none focus:border-cyan-500"
-            required
-          >
-            <option value={0}>Select product</option>
-            {products.map((product) => (
-              <option key={product.id} value={product.id}>
-                {product.name}
-              </option>
-            ))}
-          </select>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Add available units to a product at a warehouse.
+              </p>
+            </CardHeader>
 
-          <select
-            value={formData.warehouseId}
-            onChange={(event) =>
-              setFormData({
-                ...formData,
-                warehouseId: Number(event.target.value),
-              })
-            }
-            className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white outline-none focus:border-cyan-500"
-            required
-          >
-            <option value={0}>Select warehouse</option>
-            {warehouses.map((warehouse) => (
-              <option key={warehouse.id} value={warehouse.id}>
-                {warehouse.locationName}
-              </option>
-            ))}
-          </select>
+            <CardContent>
+              <form
+                onSubmit={handleAssignStock}
+                noValidate
+                className="grid grid-cols-1 gap-5 sm:grid-cols-2"
+              >
+                <FormField
+                  id="assign-productId"
+                  label="Product"
+                  error={assignErrors.productId}
+                  required
+                >
+                  <Select
+                    id="assign-productId"
+                    name="productId"
+                    value={assignData.productId}
+                    onChange={handleAssignChange("productId")}
+                    disabled={areFormsDisabled}
+                    required
+                    aria-invalid={Boolean(assignErrors.productId)}
+                    aria-describedby={
+                      assignErrors.productId
+                        ? "assign-productId-error"
+                        : undefined
+                    }
+                  >
+                    <option value="">Select a product</option>
 
-          <input
-            type="number"
-            placeholder="Quantity"
-            value={formData.quantityAvailable}
-            onChange={(event) =>
-              setFormData({
-                ...formData,
-                quantityAvailable: Number(event.target.value),
-              })
-            }
-            className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white outline-none focus:border-cyan-500"
-            min="1"
-            required
-          />
+                    {products.map((product) => (
+                      <option key={product.id} value={product.id}>
+                        {product.name} ({product.sku})
+                      </option>
+                    ))}
+                  </Select>
+                </FormField>
 
-          <button
-            type="submit"
-            disabled={isAssigning}
-            className="rounded-lg bg-cyan-500 px-4 py-3 font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {isAssigning ? "Assigning..." : "Assign Stock"}
-          </button>
-        </form>
+                <FormField
+                  id="assign-warehouseId"
+                  label="Warehouse"
+                  error={assignErrors.warehouseId}
+                  required
+                >
+                  <Select
+                    id="assign-warehouseId"
+                    name="warehouseId"
+                    value={assignData.warehouseId}
+                    onChange={handleAssignChange("warehouseId")}
+                    disabled={areFormsDisabled}
+                    required
+                    aria-invalid={Boolean(assignErrors.warehouseId)}
+                    aria-describedby={
+                      assignErrors.warehouseId
+                        ? "assign-warehouseId-error"
+                        : undefined
+                    }
+                  >
+                    <option value="">Select a warehouse</option>
 
-        {/* Reserve Stock Form */}
-        <form
-          onSubmit={handleReserveStock}
-          className="mt-6 grid grid-cols-1 gap-4 rounded-xl border border-slate-800 bg-slate-900 p-6 md:grid-cols-4"
-        >
-          <select
-            value={reserveData.productId}
-            onChange={(event) =>
-              setReserveData({
-                ...reserveData,
-                productId: Number(event.target.value),
-              })
-            }
-            className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white outline-none focus:border-amber-500"
-            required
-          >
-            <option value={0}>Select product</option>
-            {products.map((product) => (
-              <option key={product.id} value={product.id}>
-                {product.name}
-              </option>
-            ))}
-          </select>
+                    {warehouses.map((warehouse) => (
+                      <option key={warehouse.id} value={warehouse.id}>
+                        {warehouse.locationName}
+                      </option>
+                    ))}
+                  </Select>
+                </FormField>
 
-          <select
-            value={reserveData.warehouseId}
-            onChange={(event) =>
-              setReserveData({
-                ...reserveData,
-                warehouseId: Number(event.target.value),
-              })
-            }
-            className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white outline-none focus:border-amber-500"
-            required
-          >
-            <option value={0}>Select warehouse</option>
-            {warehouses.map((warehouse) => (
-              <option key={warehouse.id} value={warehouse.id}>
-                {warehouse.locationName}
-              </option>
-            ))}
-          </select>
+                <FormField
+                  id="assign-quantityAvailable"
+                  label="Quantity"
+                  error={assignErrors.quantityAvailable}
+                  hint="Enter the number of available units to add."
+                  required
+                  className="sm:col-span-2"
+                >
+                  <Input
+                    id="assign-quantityAvailable"
+                    name="quantityAvailable"
+                    type="number"
+                    inputMode="numeric"
+                    value={assignData.quantityAvailable}
+                    onChange={handleAssignChange("quantityAvailable")}
+                    placeholder="Example: 20"
+                    min="1"
+                    step="1"
+                    disabled={areFormsDisabled}
+                    required
+                    aria-invalid={Boolean(assignErrors.quantityAvailable)}
+                    aria-describedby={
+                      assignErrors.quantityAvailable
+                        ? "assign-quantityAvailable-error"
+                        : "assign-quantityAvailable-hint"
+                    }
+                  />
+                </FormField>
 
-          <input
-            type="number"
-            placeholder="Reserve quantity"
-            value={reserveData.quantity}
-            onChange={(event) =>
-              setReserveData({
-                ...reserveData,
-                quantity: Number(event.target.value),
-              })
-            }
-            className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white outline-none focus:border-amber-500"
-            min="1"
-            required
-          />
+                <Button
+                  type="submit"
+                  size="lg"
+                  className="h-11 w-full sm:col-span-2"
+                  disabled={areFormsDisabled}
+                >
+                  {pendingOperation === "assign"
+                    ? "Assigning stock..."
+                    : "Assign stock"}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
 
-          <button
-            type="submit"
-            disabled={isReserving}
-            className="rounded-lg bg-amber-500 px-4 py-3 font-semibold text-slate-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {isReserving ? "Reserving..." : "Reserve Stock"}
-          </button>
-        </form>
+          <Card>
+            <CardHeader>
+              <CardTitle>Reserve stock</CardTitle>
 
-        {/* Release Stock Form */}
+              <p className="mt-1 text-sm text-muted-foreground">
+                Move available units into reserved inventory.
+              </p>
+            </CardHeader>
 
-        <form
-          onSubmit={handleReleaseStock}
-          className="mt-6 grid grid-cols-1 gap-4 rounded-xl border border-slate-800 bg-slate-900 p-6 md:grid-cols-4"
-        >
-          <select
-            value={releaseData.productId}
-            onChange={(event) =>
-              setReleaseData({
-                ...releaseData,
-                productId: Number(event.target.value),
-              })
-            }
-            className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white outline-none focus:border-emerald-500"
-            required
-          >
-            <option value={0}>Select product</option>
-            {products.map((product) => (
-              <option key={product.id} value={product.id}>
-                {product.name}
-              </option>
-            ))}
-          </select>
+            <CardContent>
+              <form
+                onSubmit={handleReserveStock}
+                noValidate
+                className="grid grid-cols-1 gap-5 sm:grid-cols-2"
+              >
+                <FormField
+                  id="reserve-productId"
+                  label="Product"
+                  error={reserveErrors.productId}
+                  required
+                >
+                  <Select
+                    id="reserve-productId"
+                    name="productId"
+                    value={reserveData.productId}
+                    onChange={handleReserveChange("productId")}
+                    disabled={areFormsDisabled}
+                    required
+                    aria-invalid={Boolean(reserveErrors.productId)}
+                    aria-describedby={
+                      reserveErrors.productId
+                        ? "reserve-productId-error"
+                        : undefined
+                    }
+                  >
+                    <option value="">Select a product</option>
 
-          <select
-            value={releaseData.warehouseId}
-            onChange={(event) =>
-              setReleaseData({
-                ...releaseData,
-                warehouseId: Number(event.target.value),
-              })
-            }
-            className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white outline-none focus:border-emerald-500"
-            required
-          >
-            <option value={0}>Select warehouse</option>
-            {warehouses.map((warehouse) => (
-              <option key={warehouse.id} value={warehouse.id}>
-                {warehouse.locationName}
-              </option>
-            ))}
-          </select>
+                    {products.map((product) => (
+                      <option key={product.id} value={product.id}>
+                        {product.name} ({product.sku})
+                      </option>
+                    ))}
+                  </Select>
+                </FormField>
 
-          <input
-            type="number"
-            placeholder="Release quantity"
-            value={releaseData.quantity}
-            onChange={(event) =>
-              setReleaseData({
-                ...releaseData,
-                quantity: Number(event.target.value),
-              })
-            }
-            className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white outline-none focus:border-emerald-500"
-            min="1"
-            required
-          />
+                <FormField
+                  id="reserve-warehouseId"
+                  label="Warehouse"
+                  error={reserveErrors.warehouseId}
+                  required
+                >
+                  <Select
+                    id="reserve-warehouseId"
+                    name="warehouseId"
+                    value={reserveData.warehouseId}
+                    onChange={handleReserveChange("warehouseId")}
+                    disabled={areFormsDisabled}
+                    required
+                    aria-invalid={Boolean(reserveErrors.warehouseId)}
+                    aria-describedby={
+                      reserveErrors.warehouseId
+                        ? "reserve-warehouseId-error"
+                        : undefined
+                    }
+                  >
+                    <option value="">Select a warehouse</option>
 
-          <button
-            type="submit"
-            disabled={isReleasing}
-            className="rounded-lg bg-emerald-500 px-4 py-3 font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {isReleasing ? "Releasing..." : "Release Stock"}
-          </button>
-        </form>
+                    {warehouses.map((warehouse) => (
+                      <option key={warehouse.id} value={warehouse.id}>
+                        {warehouse.locationName}
+                      </option>
+                    ))}
+                  </Select>
+                </FormField>
 
-        {/* Transfer Stock Form */}
-        {/* Transfer Stock Form */}
-        <form
-          onSubmit={handleTransferStock}
-          className="mt-6 grid grid-cols-1 gap-4 rounded-xl border border-slate-800 bg-slate-900 p-6 md:grid-cols-5"
-        >
-          <select
-            value={transferData.productId}
-            onChange={(event) =>
-              setTransferData({
-                ...transferData,
-                productId: Number(event.target.value),
-              })
-            }
-            className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white outline-none focus:border-purple-500"
-            required
-          >
-            <option value={0}>Select product</option>
-            {products.map((product) => (
-              <option key={product.id} value={product.id}>
-                {product.name}
-              </option>
-            ))}
-          </select>
+                <FormField
+                  id="reserve-quantity"
+                  label="Quantity"
+                  error={reserveErrors.quantity}
+                  hint="The quantity cannot exceed current available stock."
+                  required
+                  className="sm:col-span-2"
+                >
+                  <Input
+                    id="reserve-quantity"
+                    name="quantity"
+                    type="number"
+                    inputMode="numeric"
+                    value={reserveData.quantity}
+                    onChange={handleReserveChange("quantity")}
+                    placeholder="Example: 5"
+                    min="1"
+                    step="1"
+                    disabled={areFormsDisabled}
+                    required
+                    aria-invalid={Boolean(reserveErrors.quantity)}
+                    aria-describedby={
+                      reserveErrors.quantity
+                        ? "reserve-quantity-error"
+                        : "reserve-quantity-hint"
+                    }
+                  />
+                </FormField>
 
-          <select
-            value={transferData.fromWarehouseId}
-            onChange={(event) =>
-              setTransferData({
-                ...transferData,
-                fromWarehouseId: Number(event.target.value),
-              })
-            }
-            className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white outline-none focus:border-purple-500"
-            required
-          >
-            <option value={0}>From warehouse</option>
-            {warehouses.map((warehouse) => (
-              <option key={warehouse.id} value={warehouse.id}>
-                {warehouse.locationName}
-              </option>
-            ))}
-          </select>
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  size="lg"
+                  className="h-11 w-full sm:col-span-2"
+                  disabled={areFormsDisabled}
+                >
+                  {pendingOperation === "reserve"
+                    ? "Reserving stock..."
+                    : "Reserve stock"}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
 
-          <select
-            value={transferData.toWarehouseId}
-            onChange={(event) =>
-              setTransferData({
-                ...transferData,
-                toWarehouseId: Number(event.target.value),
-              })
-            }
-            className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white outline-none focus:border-purple-500"
-            required
-          >
-            <option value={0}>To warehouse</option>
-            {warehouses.map((warehouse) => (
-              <option key={warehouse.id} value={warehouse.id}>
-                {warehouse.locationName}
-              </option>
-            ))}
-          </select>
+          <Card>
+            <CardHeader>
+              <CardTitle>Release reserved stock</CardTitle>
 
-          <input
-            type="number"
-            placeholder="Transfer quantity"
-            value={transferData.quantity}
-            onChange={(event) =>
-              setTransferData({
-                ...transferData,
-                quantity: Number(event.target.value),
-              })
-            }
-            className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white outline-none focus:border-purple-500"
-            min="1"
-            required
-          />
+              <p className="mt-1 text-sm text-muted-foreground">
+                Return reserved units to available inventory.
+              </p>
+            </CardHeader>
 
-          <button
-            type="submit"
-            disabled={isTransferring}
-            className="rounded-lg bg-purple-500 px-4 py-3 font-semibold text-white transition hover:bg-purple-400 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {isTransferring ? "Transferring..." : "Transfer Stock"}
-          </button>
-        </form>
+            <CardContent>
+              <form
+                onSubmit={handleReleaseStock}
+                noValidate
+                className="grid grid-cols-1 gap-5 sm:grid-cols-2"
+              >
+                <FormField
+                  id="release-productId"
+                  label="Product"
+                  error={releaseErrors.productId}
+                  required
+                >
+                  <Select
+                    id="release-productId"
+                    name="productId"
+                    value={releaseData.productId}
+                    onChange={handleReleaseChange("productId")}
+                    disabled={areFormsDisabled}
+                    required
+                    aria-invalid={Boolean(releaseErrors.productId)}
+                    aria-describedby={
+                      releaseErrors.productId
+                        ? "release-productId-error"
+                        : undefined
+                    }
+                  >
+                    <option value="">Select a product</option>
 
-        {/* Stock Records Table */}
-        <div className="mt-8 rounded-xl border border-slate-800 bg-slate-900">
-          <div className="border-b border-slate-800 px-6 py-4">
-            <h2 className="text-lg font-semibold text-white">Stock Records</h2>
-          </div>
+                    {products.map((product) => (
+                      <option key={product.id} value={product.id}>
+                        {product.name} ({product.sku})
+                      </option>
+                    ))}
+                  </Select>
+                </FormField>
+
+                <FormField
+                  id="release-warehouseId"
+                  label="Warehouse"
+                  error={releaseErrors.warehouseId}
+                  required
+                >
+                  <Select
+                    id="release-warehouseId"
+                    name="warehouseId"
+                    value={releaseData.warehouseId}
+                    onChange={handleReleaseChange("warehouseId")}
+                    disabled={areFormsDisabled}
+                    required
+                    aria-invalid={Boolean(releaseErrors.warehouseId)}
+                    aria-describedby={
+                      releaseErrors.warehouseId
+                        ? "release-warehouseId-error"
+                        : undefined
+                    }
+                  >
+                    <option value="">Select a warehouse</option>
+
+                    {warehouses.map((warehouse) => (
+                      <option key={warehouse.id} value={warehouse.id}>
+                        {warehouse.locationName}
+                      </option>
+                    ))}
+                  </Select>
+                </FormField>
+
+                <FormField
+                  id="release-quantity"
+                  label="Quantity"
+                  error={releaseErrors.quantity}
+                  hint="The quantity cannot exceed current reserved stock."
+                  required
+                  className="sm:col-span-2"
+                >
+                  <Input
+                    id="release-quantity"
+                    name="quantity"
+                    type="number"
+                    inputMode="numeric"
+                    value={releaseData.quantity}
+                    onChange={handleReleaseChange("quantity")}
+                    placeholder="Example: 3"
+                    min="1"
+                    step="1"
+                    disabled={areFormsDisabled}
+                    required
+                    aria-invalid={Boolean(releaseErrors.quantity)}
+                    aria-describedby={
+                      releaseErrors.quantity
+                        ? "release-quantity-error"
+                        : "release-quantity-hint"
+                    }
+                  />
+                </FormField>
+
+                <Button
+                  type="submit"
+                  variant="outline"
+                  size="lg"
+                  className="h-11 w-full sm:col-span-2"
+                  disabled={areFormsDisabled}
+                >
+                  {pendingOperation === "release"
+                    ? "Releasing stock..."
+                    : "Release stock"}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Transfer stock</CardTitle>
+
+              <p className="mt-1 text-sm text-muted-foreground">
+                Move available units from one warehouse to another.
+              </p>
+            </CardHeader>
+
+            <CardContent>
+              <form
+                onSubmit={handleTransferStock}
+                noValidate
+                className="grid grid-cols-1 gap-5 sm:grid-cols-2"
+              >
+                <FormField
+                  id="transfer-productId"
+                  label="Product"
+                  error={transferErrors.productId}
+                  required
+                  className="sm:col-span-2"
+                >
+                  <Select
+                    id="transfer-productId"
+                    name="productId"
+                    value={transferData.productId}
+                    onChange={handleTransferChange("productId")}
+                    disabled={areFormsDisabled}
+                    required
+                    aria-invalid={Boolean(transferErrors.productId)}
+                    aria-describedby={
+                      transferErrors.productId
+                        ? "transfer-productId-error"
+                        : undefined
+                    }
+                  >
+                    <option value="">Select a product</option>
+
+                    {products.map((product) => (
+                      <option key={product.id} value={product.id}>
+                        {product.name} ({product.sku})
+                      </option>
+                    ))}
+                  </Select>
+                </FormField>
+
+                <FormField
+                  id="transfer-fromWarehouseId"
+                  label="Source warehouse"
+                  error={transferErrors.fromWarehouseId}
+                  required
+                >
+                  <Select
+                    id="transfer-fromWarehouseId"
+                    name="fromWarehouseId"
+                    value={transferData.fromWarehouseId}
+                    onChange={handleTransferChange("fromWarehouseId")}
+                    disabled={areFormsDisabled}
+                    required
+                    aria-invalid={Boolean(transferErrors.fromWarehouseId)}
+                    aria-describedby={
+                      transferErrors.fromWarehouseId
+                        ? "transfer-fromWarehouseId-error"
+                        : undefined
+                    }
+                  >
+                    <option value="">Select the source</option>
+
+                    {warehouses.map((warehouse) => (
+                      <option key={warehouse.id} value={warehouse.id}>
+                        {warehouse.locationName}
+                      </option>
+                    ))}
+                  </Select>
+                </FormField>
+
+                <FormField
+                  id="transfer-toWarehouseId"
+                  label="Destination warehouse"
+                  error={transferErrors.toWarehouseId}
+                  required
+                >
+                  <Select
+                    id="transfer-toWarehouseId"
+                    name="toWarehouseId"
+                    value={transferData.toWarehouseId}
+                    onChange={handleTransferChange("toWarehouseId")}
+                    disabled={areFormsDisabled}
+                    required
+                    aria-invalid={Boolean(transferErrors.toWarehouseId)}
+                    aria-describedby={
+                      transferErrors.toWarehouseId
+                        ? "transfer-toWarehouseId-error"
+                        : undefined
+                    }
+                  >
+                    <option value="">Select the destination</option>
+
+                    {warehouses.map((warehouse) => (
+                      <option
+                        key={warehouse.id}
+                        value={warehouse.id}
+                        disabled={
+                          warehouse.id === Number(transferData.fromWarehouseId)
+                        }
+                      >
+                        {warehouse.locationName}
+                      </option>
+                    ))}
+                  </Select>
+                </FormField>
+
+                <FormField
+                  id="transfer-quantity"
+                  label="Quantity"
+                  error={transferErrors.quantity}
+                  hint="Only currently available units can be transferred."
+                  required
+                  className="sm:col-span-2"
+                >
+                  <Input
+                    id="transfer-quantity"
+                    name="quantity"
+                    type="number"
+                    inputMode="numeric"
+                    value={transferData.quantity}
+                    onChange={handleTransferChange("quantity")}
+                    placeholder="Example: 10"
+                    min="1"
+                    step="1"
+                    disabled={areFormsDisabled}
+                    required
+                    aria-invalid={Boolean(transferErrors.quantity)}
+                    aria-describedby={
+                      transferErrors.quantity
+                        ? "transfer-quantity-error"
+                        : "transfer-quantity-hint"
+                    }
+                  />
+                </FormField>
+
+                <Button
+                  type="submit"
+                  size="lg"
+                  className="h-11 w-full sm:col-span-2"
+                  disabled={areFormsDisabled}
+                >
+                  {pendingOperation === "transfer"
+                    ? "Transferring stock..."
+                    : "Transfer stock"}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-4">
+            <div>
+              <CardTitle>Stock records</CardTitle>
+
+              <p className="mt-1 text-sm text-muted-foreground">
+                {stockItems.length === 1
+                  ? "1 stock record"
+                  : `${stockItems.length} stock records`}
+              </p>
+            </div>
+          </CardHeader>
 
           {isLoading ? (
-            <p className="p-6 text-slate-400">Loading stock records...</p>
+            <LoadingState message="Loading stock records..." />
           ) : stockItems.length === 0 ? (
-            <p className="p-6 text-slate-400">No stock records found.</p>
+            <EmptyState
+              title="No stock records available"
+              description="Assign stock to a product and warehouse to create the first stock record."
+            />
           ) : (
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-950 text-slate-400">
-                <tr>
-                  <th className="px-6 py-3">Product</th>
-                  <th className="px-6 py-3">Warehouse</th>
-                  <th className="px-6 py-3">Available</th>
-                  <th className="px-6 py-3">Reserved</th>
-                  <th className="px-6 py-3">Total</th>
-                </tr>
-              </thead>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-190 text-left text-sm">
+                <caption className="sr-only">
+                  Current product stock by warehouse
+                </caption>
 
-              <tbody>
-                {stockItems.map((item) => (
-                  <tr
-                    key={`${item.productId}-${item.warehouseId}`}
-                    className="border-t border-slate-800"
-                  >
-                    <td className="px-6 py-4 text-white">{item.productName}</td>
+                <thead className="bg-muted/40 text-muted-foreground">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 font-medium">
+                      Product
+                    </th>
 
-                    <td className="px-6 py-4 text-slate-300">
-                      {item.warehouseName}
-                    </td>
+                    <th scope="col" className="px-6 py-3 font-medium">
+                      SKU
+                    </th>
 
-                    <td className="px-6 py-4 text-slate-300">
-                      {item.quantityAvailable}
-                    </td>
+                    <th scope="col" className="px-6 py-3 font-medium">
+                      Warehouse
+                    </th>
 
-                    <td className="px-6 py-4 text-slate-300">
-                      {item.quantityReserved}
-                    </td>
+                    <th scope="col" className="px-6 py-3 font-medium">
+                      Available
+                    </th>
 
-                    <td className="px-6 py-4 text-slate-300">
-                      {item.totalQuantity}
-                    </td>
+                    <th scope="col" className="px-6 py-3 font-medium">
+                      Reserved
+                    </th>
+
+                    <th scope="col" className="px-6 py-3 font-medium">
+                      Total
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+
+                <tbody>
+                  {stockItems.map((item) => (
+                    <tr
+                      key={`${item.productId}-${item.warehouseId}`}
+                      className="border-t border-border transition hover:bg-muted/20"
+                    >
+                      <td className="px-6 py-4 font-medium text-foreground">
+                        {item.productName}
+                      </td>
+
+                      <td className="px-6 py-4 text-muted-foreground">
+                        {item.sku}
+                      </td>
+
+                      <td className="px-6 py-4 text-muted-foreground">
+                        {item.warehouseName}
+                      </td>
+
+                      <td className="px-6 py-4 tabular-nums text-muted-foreground">
+                        {item.quantityAvailable}
+                      </td>
+
+                      <td className="px-6 py-4 tabular-nums text-muted-foreground">
+                        {item.quantityReserved}
+                      </td>
+
+                      <td className="px-6 py-4 tabular-nums text-muted-foreground">
+                        {item.totalQuantity}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
-        </div>
+        </Card>
       </div>
     </DashboardLayout>
   );

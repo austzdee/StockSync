@@ -18,14 +18,16 @@ public class WarehouseService : IWarehouseService
     public async Task<IEnumerable<WarehouseResponseDto>> GetAllAsync()
     {
         return await _context.Warehouses
-            .Where(w => !w.IsDeleted)
-            .Select(w => new WarehouseResponseDto
-            {
-                Id = w.Id,
-                LocationName = w.LocationName,
-                Address = w.Address
-            })
-            .ToListAsync();
+    .Where(w => !w.IsDeleted)
+    .OrderBy(w => w.LocationName)
+    .ThenBy(w => w.Address)
+    .Select(w => new WarehouseResponseDto
+    {
+        Id = w.Id,
+        LocationName = w.LocationName,
+        Address = w.Address
+    })
+    .ToListAsync();
     }
 
     public async Task<WarehouseResponseDto?> GetByIdAsync(int id)

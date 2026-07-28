@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using StockSync.Data;
 using StockSync.DTOs;
 using StockSync.Entities;
@@ -159,42 +160,57 @@ public class StockService : IStockService
         };
     }
 
-    public async Task<StockTransferResponseDto> TransferStockAsync(TransferStockDto dto)
+    public async Task<StockTransferResponseDto> TransferStockAsync(
+        TransferStockDto dto)
     {
         if (dto.Quantity <= 0)
-            throw new InvalidOperationException("Quantity must be greater than zero.");
+            throw new InvalidOperationException(
+                "Quantity must be greater than zero.");
 
         if (dto.FromWarehouseId == dto.ToWarehouseId)
-            throw new InvalidOperationException("Source and destination warehouses must be different.");
+            throw new InvalidOperationException(
+                "Source and destination warehouses must be different.");
 
-        // Validate both warehouses before opening the transaction to keep the locked work short.
         var sourceWarehouseExists = await _context.Warehouses
-            .AnyAsync(w => w.Id == dto.FromWarehouseId && !w.IsDeleted);
+            .AnyAsync(w =>
+                w.Id == dto.FromWarehouseId &&
+                !w.IsDeleted);
 
         if (!sourceWarehouseExists)
-            throw new KeyNotFoundException("Source warehouse not found.");
+            throw new KeyNotFoundException(
+                "Source warehouse not found.");
 
         var destinationWarehouseExists = await _context.Warehouses
-            .AnyAsync(w => w.Id == dto.ToWarehouseId && !w.IsDeleted);
+            .AnyAsync(w =>
+                w.Id == dto.ToWarehouseId &&
+                !w.IsDeleted);
 
         if (!destinationWarehouseExists)
-            throw new KeyNotFoundException("Destination warehouse not found.");
+            throw new KeyNotFoundException(
+                "Destination warehouse not found.");
 
-        // Source decrement, destination increment, and audit records must commit atomically.
-        await using var transaction = await _context.Database.BeginTransactionAsync();
+        var executionStrategy =
+            _context.Database.CreateExecutionStrategy();
 
-        try
+        return await executionStrategy.ExecuteAsync(async () =>
         {
+            _context.ChangeTracker.Clear();
+
+            await using var transaction =
+                await _context.Database.BeginTransactionAsync();
+
             var sourceStock = await _context.Stocks
                 .FirstOrDefaultAsync(s =>
                     s.ProductId == dto.ProductId &&
                     s.WarehouseId == dto.FromWarehouseId);
 
             if (sourceStock is null)
-                throw new KeyNotFoundException("Source stock record not found.");
+                throw new KeyNotFoundException(
+                    "Source stock record not found.");
 
             if (sourceStock.QuantityAvailable < dto.Quantity)
-                throw new InvalidOperationException("Not enough available stock in source warehouse.");
+                throw new InvalidOperationException(
+                    "Not enough available stock in source warehouse.");
 
             var destinationStock = await _context.Stocks
                 .FirstOrDefaultAsync(s =>
@@ -217,7 +233,6 @@ public class StockService : IStockService
             sourceStock.QuantityAvailable -= dto.Quantity;
             destinationStock.QuantityAvailable += dto.Quantity;
 
-            // Store separate audit rows so each warehouse ledger can be reviewed independently.
             _context.AuditLogs.AddRange(
                 new AuditLog
                 {
@@ -234,8 +249,7 @@ public class StockService : IStockService
                     Action = "TRANSFER_IN",
                     QuantityChanged = dto.Quantity,
                     PerformedBy = "system"
-                }
-            );
+                });
 
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
@@ -247,16 +261,14 @@ public class StockService : IStockService
                 FromWarehouseId = dto.FromWarehouseId,
                 ToWarehouseId = dto.ToWarehouseId,
                 QuantityTransferred = dto.Quantity,
-                SourceQuantityAvailable = sourceStock.QuantityAvailable,
-                DestinationQuantityAvailable = destinationStock.QuantityAvailable
+                SourceQuantityAvailable =
+                    sourceStock.QuantityAvailable,
+                DestinationQuantityAvailable =
+                    destinationStock.QuantityAvailable
             };
-        }
-        catch
-        {
-            await transaction.RollbackAsync();
-            throw;
-        }
+        });
     }
+
 
     public async Task<IEnumerable<StockListItemDto>> GetLowStockAsync()
     {

@@ -11,7 +11,7 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(false);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
+    <div className="dark min-h-screen bg-background text-foreground">
       {mobileSidebarOpen && (
         <button
           type="button"
