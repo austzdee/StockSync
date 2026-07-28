@@ -1,137 +1,356 @@
-import { useEffect, useState } from "react";
-import DashboardCard from "../components/DashboardCard";
-import DashboardLayout from "../layouts/DashboardLayout";
-import { getProducts, type Product } from "../services/productService";
-import { getWarehouses, type Warehouse } from "../services/warehouseService";
-import { getStock, type StockItem } from "../services/stockService";
-import { getAuditLogs, type AuditLog } from "../services/auditService";
-import DashboardCharts from "../components/DashboardCharts";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+
+import DashboardCard from "@/components/DashboardCard";
+import DashboardCharts from "@/components/DashboardCharts";
+import EmptyState from "@/components/feedback/EmptyState";
+import LoadingState from "@/components/feedback/LoadingState";
+import PageHeader from "@/components/shared/PageHeader";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
+import DashboardLayout from "@/layouts/DashboardLayout";
+import { getAuditLogs, type AuditLog } from "@/services/auditService";
+import { getProducts, type Product } from "@/services/productService";
+import { getStock, type StockItem } from "@/services/stockService";
+import { getWarehouses, type Warehouse } from "@/services/warehouseService";
+
+const lowStockThreshold = 10;
+const criticalStockThreshold = 5;
+
+const currencyFormatter = new Intl.NumberFormat("en-GB", {
+  style: "currency",
+  currency: "GBP",
+  maximumFractionDigits: 2,
+});
+
+const formatDate = (date: string) =>
+  new Date(date).toLocaleString("en-GB", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+
+const formatAction = (action: string) => action.replaceAll("_", " ");
+
+const getActionBadgeClass = (action: string) => {
+  switch (action.toUpperCase()) {
+    case "ASSIGN":
+      return "border-success/30 bg-success/10 text-success";
+
+    case "RESERVE":
+      return "border-warning/30 bg-warning/10 text-warning";
+
+    case "RELEASE":
+      return "border-primary/30 bg-primary/10 text-primary";
+
+    case "TRANSFER":
+    case "TRANSFER_IN":
+    case "TRANSFER_OUT":
+      return "border-chart-2/30 bg-chart-2/10 text-chart-2";
+
+    default:
+      return "border-border bg-muted text-muted-foreground";
+  }
+};
+
+const getStockStatus = (totalQuantity: number) => {
+  if (totalQuantity <= criticalStockThreshold) {
+    return "Critical";
+  }
+
+  if (totalQuantity < lowStockThreshold) {
+    return "Low";
+  }
+
+  return "Healthy";
+};
+
+const getStockStatusBadgeClass = (totalQuantity: number) => {
+  const status = getStockStatus(totalQuantity);
+
+  if (status === "Critical") {
+    return "border-destructive/30 bg-destructive/10 text-destructive";
+  }
+
+  if (status === "Low") {
+    return "border-warning/30 bg-warning/10 text-warning";
+  }
+
+  return "border-success/30 bg-success/10 text-success";
+};
 
 const DashboardPage = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  /**
+   * Loads the inventory data required by the dashboard.
+   */
+  const loadDashboardData = async (
+    showErrorNotification = true,
+  ): Promise<boolean> => {
+    try {
+      const [productData, warehouseData, stockData, auditLogData] =
+        await Promise.all([
+          getProducts(),
+          getWarehouses(),
+          getStock(),
+          getAuditLogs(),
+        ]);
+
+      const sortedProducts = [...productData].sort((first, second) =>
+        first.name.localeCompare(second.name, "en-GB", {
+          sensitivity: "base",
+        }),
+      );
+
+      const sortedWarehouses = [...warehouseData].sort((first, second) =>
+        first.locationName.localeCompare(second.locationName, "en-GB", {
+          sensitivity: "base",
+        }),
+      );
+
+      const sortedStockItems = [...stockData.results].sort((first, second) => {
+        const productComparison = first.productName.localeCompare(
+          second.productName,
+          "en-GB",
+          {
+            sensitivity: "base",
+          },
+        );
+
+        if (productComparison !== 0) {
+          return productComparison;
+        }
+
+        return first.warehouseName.localeCompare(
+          second.warehouseName,
+          "en-GB",
+          {
+            sensitivity: "base",
+          },
+        );
+      });
+
+      setProducts(sortedProducts);
+      setWarehouses(sortedWarehouses);
+      setStockItems(sortedStockItems);
+      setAuditLogs(auditLogData);
+
+      return true;
+    } catch (error) {
+      console.error("Failed to load dashboard data", error);
+
+      const message = getApiErrorMessage(
+        error,
+        "Unable to load dashboard data. Please try again.",
+      );
+
+      setLoadError(message);
+
+      if (showErrorNotification) {
+        toast.error(message);
+      }
+
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const loadDashboardData = async () => {
-      try {
-        const [productData, warehouseData, stockData, auditLogData] =
-          await Promise.all([
-            getProducts(),
-            getWarehouses(),
-            getStock(),
-            getAuditLogs(),
-          ]);
-
-        setProducts(productData);
-        setWarehouses(warehouseData);
-        setStockItems(stockData.results);
-        setAuditLogs(auditLogData);
-      } catch (error) {
-        console.error("Failed to load dashboard data", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadDashboardData();
+    // State updates occur only after the asynchronous requests settle.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadDashboardData();
   }, []);
 
-  const totalAvailableUnits = stockItems.reduce(
-    (sum, item) => sum + item.quantityAvailable,
-    0,
+  const productNames = useMemo(
+    () => new Map(products.map((product) => [product.id, product.name])),
+    [products],
   );
 
-  const totalReservedUnits = stockItems.reduce(
-    (sum, item) => sum + item.quantityReserved,
-    0,
+  const productPrices = useMemo(
+    () => new Map(products.map((product) => [product.id, product.price])),
+    [products],
   );
 
-  const totalInventoryUnits = stockItems.reduce(
-    (sum, item) => sum + item.totalQuantity,
-    0,
+  const warehouseNames = useMemo(
+    () =>
+      new Map(
+        warehouses.map((warehouse) => [warehouse.id, warehouse.locationName]),
+      ),
+    [warehouses],
   );
 
-  const inventoryValue = stockItems.reduce((total, stockItem) => {
-    const product = products.find(
-      (product) => product.id === stockItem.productId,
-    );
+  const knownWarehouseIds = useMemo(
+    () => new Set(warehouses.map((warehouse) => warehouse.id)),
+    [warehouses],
+  );
 
-    if (!product) return total;
+  const totalAvailableUnits = useMemo(
+    () => stockItems.reduce((sum, item) => sum + item.quantityAvailable, 0),
+    [stockItems],
+  );
 
-    return total + product.price * stockItem.quantityAvailable;
-  }, 0);
+  const totalReservedUnits = useMemo(
+    () => stockItems.reduce((sum, item) => sum + item.quantityReserved, 0),
+    [stockItems],
+  );
 
-  const lowStockRecords = stockItems.filter((item) => item.totalQuantity < 10);
+  const totalInventoryUnits = useMemo(
+    () => stockItems.reduce((sum, item) => sum + item.totalQuantity, 0),
+    [stockItems],
+  );
+
+  const inventoryValue = useMemo(
+    () =>
+      stockItems.reduce((total, stockItem) => {
+        const unitPrice = productPrices.get(stockItem.productId) ?? 0;
+
+        return total + unitPrice * stockItem.quantityAvailable;
+      }, 0),
+    [productPrices, stockItems],
+  );
+
+  const lowStockRecords = useMemo(
+    () => stockItems.filter((item) => item.totalQuantity < lowStockThreshold),
+    [stockItems],
+  );
 
   const reservedStockPercentage =
     totalInventoryUnits === 0
       ? 0
       : Math.round((totalReservedUnits / totalInventoryUnits) * 100);
 
+  const activeWarehouseCount = useMemo(
+    () =>
+      new Set(
+        stockItems
+          .filter(
+            (item) =>
+              item.totalQuantity > 0 && knownWarehouseIds.has(item.warehouseId),
+          )
+          .map((item) => item.warehouseId),
+      ).size,
+    [knownWarehouseIds, stockItems],
+  );
+
   const warehouseUtilization =
     warehouses.length === 0
       ? 0
-      : Math.round(
-          (stockItems.filter((item) => item.totalQuantity > 0).length /
-            warehouses.length) *
-            100,
-        );
+      : Math.round((activeWarehouseCount / warehouses.length) * 100);
 
-  const inventoryByCategory = stockItems.reduce<Record<string, number>>(
-    (result, item) => {
-      result[item.category] = (result[item.category] ?? 0) + item.totalQuantity;
-      return result;
-    },
-    {},
+  const inventoryByCategory = useMemo(() => {
+    const categoryTotals = stockItems.reduce<Record<string, number>>(
+      (result, item) => {
+        const category = item.category.trim() || "Uncategorised";
+
+        result[category] = (result[category] ?? 0) + item.totalQuantity;
+
+        return result;
+      },
+      {},
+    );
+
+    return Object.entries(categoryTotals)
+      .map(([name, value]) => ({
+        name,
+        value,
+      }))
+      .sort(
+        (first, second) =>
+          second.value - first.value ||
+          first.name.localeCompare(second.name, "en-GB", {
+            sensitivity: "base",
+          }),
+      );
+  }, [stockItems]);
+
+  const inventoryByWarehouse = useMemo(
+    () =>
+      warehouses
+        .map((warehouse) => ({
+          name: warehouse.locationName,
+          value: stockItems
+            .filter((item) => item.warehouseId === warehouse.id)
+            .reduce((sum, item) => sum + item.totalQuantity, 0),
+        }))
+        .sort(
+          (first, second) =>
+            second.value - first.value ||
+            first.name.localeCompare(second.name, "en-GB", {
+              sensitivity: "base",
+            }),
+        ),
+    [stockItems, warehouses],
   );
 
-  const inventoryByWarehouse = warehouses.map((warehouse) => {
-    const totalQuantity = stockItems
-      .filter((item) => item.warehouseId === warehouse.id)
-      .reduce((sum, item) => sum + item.totalQuantity, 0);
+  const topStockItems = useMemo(
+    () =>
+      [...stockItems]
+        .sort(
+          (first, second) =>
+            second.totalQuantity - first.totalQuantity ||
+            first.productName.localeCompare(second.productName, "en-GB", {
+              sensitivity: "base",
+            }),
+        )
+        .slice(0, 5),
+    [stockItems],
+  );
 
-    return {
-      name: warehouse.locationName,
-      value: totalQuantity,
-    };
-  });
+  const recentAuditLogs = useMemo(
+    () =>
+      [...auditLogs]
+        .sort(
+          (first, second) =>
+            new Date(second.createdAtUtc).getTime() -
+            new Date(first.createdAtUtc).getTime(),
+        )
+        .slice(0, 5),
+    [auditLogs],
+  );
 
-  const topStockItems = [...stockItems]
-    .sort(
-      (firstItem, secondItem) =>
-        secondItem.totalQuantity - firstItem.totalQuantity,
-    )
-    .slice(0, 5);
+  const handleRetry = () => {
+    setIsLoading(true);
+    setLoadError(null);
+    void loadDashboardData();
+  };
 
   return (
     <DashboardLayout>
       <div className="space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            <span className="text-stone-300">Stock</span>
-            <span className="bg-gradient-to-r from-amber-500 via-orange-400 to-cyan-400 bg-clip-text text-transparent">
-              Sync
-            </span>
-            <span className="ml-3 text-white">Dashboard</span>
-          </h1>
-
-          <p className="mt-3 text-slate-400">
-            Real-time inventory performance, stock risks and warehouse insights.
-          </p>
-        </div>
+        <PageHeader
+          title="Dashboard"
+          description="Real-time inventory performance, stock risks and warehouse insights."
+        />
 
         {isLoading ? (
-          <div className="rounded-xl border border-slate-800 bg-slate-900 p-6 text-slate-400">
-            Loading dashboard analytics...
-          </div>
+          <Card>
+            <LoadingState message="Loading dashboard analytics..." />
+          </Card>
+        ) : loadError ? (
+          <Card>
+            <EmptyState
+              title="Dashboard could not be loaded"
+              description={loadError}
+              action={
+                <Button type="button" onClick={handleRetry}>
+                  Retry
+                </Button>
+              }
+            />
+          </Card>
         ) : (
           <>
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
               <DashboardCard
-                title="Total Products"
+                title="Total products"
                 value={products.length}
                 description="Products currently tracked"
               />
@@ -139,179 +358,204 @@ const DashboardPage = () => {
               <DashboardCard
                 title="Warehouses"
                 value={warehouses.length}
-                description="Active storage locations"
+                description="Storage locations currently configured"
                 tone="success"
               />
 
               <DashboardCard
-                title="Available Units"
+                title="Available units"
                 value={totalAvailableUnits}
                 description="Units available for sale or allocation"
               />
 
               <DashboardCard
-                title="Reserved Units"
+                title="Reserved units"
                 value={totalReservedUnits}
                 description={`${reservedStockPercentage}% of inventory reserved`}
                 tone="danger"
               />
 
               <DashboardCard
-                title="Inventory Units"
+                title="Inventory units"
                 value={totalInventoryUnits}
-                description="Total available and reserved units"
+                description="Available and reserved units combined"
                 tone="success"
               />
 
               <DashboardCard
-                title="Inventory Value"
-                value={`£${inventoryValue.toLocaleString(undefined, {
-                  maximumFractionDigits: 2,
-                })}`}
+                title="Inventory value"
+                value={currencyFormatter.format(inventoryValue)}
                 description="Current value of available inventory"
                 tone="success"
               />
 
               <DashboardCard
-                title="Low Stock Items"
+                title="Low-stock records"
                 value={lowStockRecords.length}
-                description="Stock records below threshold"
+                description={`Records below ${lowStockThreshold} total units`}
                 tone="warning"
               />
             </div>
 
-            <div className="grid gap-6 xl:grid-cols-3">
+            <div className="grid gap-6 lg:grid-cols-2">
               <AnalyticsPanel
-                title="Recent Activity"
-                description="Latest stock movements across the platform."
+                title="Recent activity"
+                description="The five most recent inventory movements."
               >
-                <div className="space-y-3">
-                  {auditLogs.length === 0 ? (
-                    <p className="text-sm text-slate-400">
-                      No recent activity found.
-                    </p>
-                  ) : (
-                    auditLogs.slice(0, 5).map((log) => (
-                      <div
+                {recentAuditLogs.length === 0 ? (
+                  <EmptyState
+                    title="No recent activity"
+                    description="Inventory movements will appear after stock operations are completed."
+                  />
+                ) : (
+                  <ul className="space-y-3">
+                    {recentAuditLogs.map((log) => (
+                      <li
                         key={log.id}
-                        className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-950 px-4 py-3"
+                        className="flex flex-col gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
                       >
-                        <div>
-                          <p className="font-medium text-white">{log.action}</p>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span
+                              className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${getActionBadgeClass(
+                                log.action,
+                              )}`}
+                            >
+                              {formatAction(log.action)}
+                            </span>
 
-                          <p className="text-xs text-slate-500">
-                            Product #{log.productId} • Warehouse #
-                            {log.warehouseId}
+                            <p className="truncate font-medium text-foreground">
+                              {productNames.get(log.productId) ??
+                                `Product #${log.productId}`}
+                            </p>
+                          </div>
+
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {warehouseNames.get(log.warehouseId) ??
+                              `Warehouse #${log.warehouseId}`}
+                            {" · "}
+                            {formatDate(log.createdAtUtc)}
                           </p>
                         </div>
 
-                        <span className="text-sm font-semibold text-amber-400">
-                          {log.quantityChanged}
+                        <span className="shrink-0 text-sm font-semibold tabular-nums text-primary">
+                          {log.quantityChanged > 0
+                            ? `+${log.quantityChanged}`
+                            : log.quantityChanged}
                         </span>
-                      </div>
-                    ))
-                  )}
-                </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </AnalyticsPanel>
 
               <AnalyticsPanel
-                title="Inventory Health"
+                title="Inventory health"
                 description="Operational overview of current stock performance."
               >
-                <AnalyticsMetric
-                  label="Reserved Stock Ratio"
-                  value={`${reservedStockPercentage}%`}
-                />
+                <dl>
+                  <AnalyticsMetric
+                    label="Reserved stock ratio"
+                    value={`${reservedStockPercentage}%`}
+                  />
 
-                <AnalyticsMetric
-                  label="Warehouse Utilization"
-                  value={`${warehouseUtilization}%`}
-                />
+                  <AnalyticsMetric
+                    label="Warehouse utilisation"
+                    value={`${warehouseUtilization}%`}
+                  />
 
-                <AnalyticsMetric
-                  label="Low Stock Records"
-                  value={lowStockRecords.length}
-                />
+                  <AnalyticsMetric
+                    label="Active warehouses"
+                    value={`${activeWarehouseCount} of ${warehouses.length}`}
+                  />
+
+                  <AnalyticsMetric
+                    label="Low-stock records"
+                    value={lowStockRecords.length}
+                  />
+                </dl>
               </AnalyticsPanel>
 
               <AnalyticsPanel
-                title="Top Stock Items"
-                description="Highest quantity products across all warehouses."
+                title="Top stock items"
+                description="Highest quantity stock records across all warehouses."
               >
-                <div className="space-y-3">
-                  {topStockItems.length === 0 ? (
-                    <p className="text-sm text-slate-400">
-                      No stock records available.
-                    </p>
-                  ) : (
-                    topStockItems.map((item) => (
-                      <div
+                {topStockItems.length === 0 ? (
+                  <EmptyState
+                    title="No stock records"
+                    description="Top inventory records will appear after stock is assigned."
+                  />
+                ) : (
+                  <ul className="space-y-3">
+                    {topStockItems.map((item) => (
+                      <li
                         key={`${item.productId}-${item.warehouseId}`}
-                        className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-950 px-4 py-3"
+                        className="flex items-center justify-between gap-4 rounded-lg border border-border bg-muted/30 px-4 py-3"
                       >
-                        <div>
-                          <p className="font-medium text-white">
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-foreground">
                             {item.productName}
                           </p>
-                          <p className="text-xs text-slate-500">
+
+                          <p className="truncate text-xs text-muted-foreground">
                             {item.warehouseName}
                           </p>
                         </div>
 
-                        <span className="text-sm font-semibold text-amber-400">
-                          {item.totalQuantity}
+                        <span className="shrink-0 text-sm font-semibold tabular-nums text-primary">
+                          {item.totalQuantity.toLocaleString("en-GB")} units
                         </span>
-                      </div>
-                    ))
-                  )}
-                </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </AnalyticsPanel>
 
               <AnalyticsPanel
-                title="Low Stock Watchlist"
-                description="Items that may need replenishment soon."
+                title="Low-stock watchlist"
+                description="Inventory records that may need replenishment."
               >
-                <div className="space-y-3">
-                  {lowStockRecords.length === 0 ? (
-                    <p className="text-sm text-slate-400">
-                      No low stock records found.
-                    </p>
-                  ) : (
-                    lowStockRecords.slice(0, 5).map((item) => (
-                      <div
+                {lowStockRecords.length === 0 ? (
+                  <EmptyState
+                    title="No low-stock records"
+                    description="All inventory records are above the low-stock threshold."
+                  />
+                ) : (
+                  <ul className="space-y-3">
+                    {lowStockRecords.slice(0, 5).map((item) => (
+                      <li
                         key={`${item.productId}-${item.warehouseId}`}
-                        className="flex items-center justify-between rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-3"
+                        className="flex items-center justify-between gap-4 rounded-lg border border-border bg-muted/30 px-4 py-3"
                       >
-                        <div>
-                          <p className="font-medium text-white">
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-foreground">
                             {item.productName}
                           </p>
-                          <p className="text-xs text-slate-500">
+
+                          <p className="truncate text-xs text-muted-foreground">
                             {item.warehouseName}
                           </p>
                         </div>
 
-                        <span className="rounded-full border border-red-500/30 bg-red-500/10 px-3 py-1 text-xs font-semibold text-red-400">
-                          {item.totalQuantity}
+                        <span
+                          className={`inline-flex shrink-0 rounded-full border px-3 py-1 text-xs font-semibold ${getStockStatusBadgeClass(
+                            item.totalQuantity,
+                          )}`}
+                        >
+                          {getStockStatus(item.totalQuantity)}:{" "}
+                          {item.totalQuantity.toLocaleString("en-GB")}
                         </span>
-                      </div>
-                    ))
-                  )}
-                </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </AnalyticsPanel>
             </div>
 
-            <div className="grid gap-6 xl:grid-cols-2">
-              <DashboardCharts
-  categoryData={Object.entries(inventoryByCategory).map(
-    ([name, value]) => ({
-      name,
-      value,
-    })
-  )}
-  warehouseData={inventoryByWarehouse}
-/>
-            </div>
+            <DashboardCharts
+              categoryData={inventoryByCategory}
+              warehouseData={inventoryByWarehouse}
+            />
           </>
         )}
       </div>
@@ -322,41 +566,38 @@ const DashboardPage = () => {
 interface AnalyticsPanelProps {
   title: string;
   description: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 const AnalyticsPanel = ({
   title,
   description,
   children,
-}: AnalyticsPanelProps) => {
-  return (
-    <section className="rounded-xl border border-slate-800 bg-slate-900 p-6">
-      <h2 className="text-lg font-semibold text-white">{title}</h2>
+}: AnalyticsPanelProps) => (
+  <Card>
+    <CardHeader>
+      <CardTitle>{title}</CardTitle>
 
-      <p className="mt-1 text-sm text-slate-400">{description}</p>
+      <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+    </CardHeader>
 
-      <div className="mt-5">{children}</div>
-    </section>
-  );
-};
+    <CardContent>{children}</CardContent>
+  </Card>
+);
 
 interface AnalyticsMetricProps {
   label: string;
   value: string | number;
 }
 
-const AnalyticsMetric = ({ label, value }: AnalyticsMetricProps) => {
-  return (
-    <div className="flex items-center justify-between border-b border-slate-800 py-3 last:border-b-0">
-      <span className="text-sm text-slate-400">{label}</span>
-      <span className="text-lg font-bold text-white">{value}</span>
-    </div>
-  );
-};
+const AnalyticsMetric = ({ label, value }: AnalyticsMetricProps) => (
+  <div className="flex items-center justify-between gap-4 border-b border-border py-3 first:pt-0 last:border-b-0 last:pb-0">
+    <dt className="text-sm text-muted-foreground">{label}</dt>
 
-
-  
-
+    <dd className="text-lg font-bold tabular-nums text-foreground">
+      {typeof value === "number" ? value.toLocaleString("en-GB") : value}
+    </dd>
+  </div>
+);
 
 export default DashboardPage;
