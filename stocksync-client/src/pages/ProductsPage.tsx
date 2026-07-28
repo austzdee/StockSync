@@ -1,7 +1,20 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import { toast } from "sonner";
-import { getApiErrorMessage } from "../lib/getApiErrorMessage";
-import DashboardLayout from "../layouts/DashboardLayout";
+
+import EmptyState from "@/components/feedback/EmptyState";
+import LoadingState from "@/components/feedback/LoadingState";
+import PageHeader from "@/components/shared/PageHeader";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FormField } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
+import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
+import {
+  type ProductFormErrors,
+  type ProductFormValues,
+  validateProductForm,
+} from "@/lib/productValidation";
+import DashboardLayout from "@/layouts/DashboardLayout";
 import {
   createProduct,
   deleteProduct,
@@ -9,40 +22,35 @@ import {
   updateProduct,
   type CreateProductRequest,
   type Product,
-} from "../services/productService";
+} from "@/services/productService";
+
+const emptyFormValues: ProductFormValues = {
+  name: "",
+  sku: "",
+  category: "",
+  price: "",
+};
 
 const ProductsPage = () => {
-  // ID of the product currently being edited; null means create mode.
-  const [editingProductId , setEditingProductId] = useState<number | null>(null);
-
-  // Product list loaded from the API and shown in the table.
   const [products, setProducts] = useState<Product[]>([]);
+  const [editingProductId, setEditingProductId] = useState<number | null>(null);
 
-  // Tracks whether the initial products load is still in progress.
+  const [formData, setFormData] = useState<ProductFormValues>(emptyFormValues);
+
+  const [formErrors, setFormErrors] = useState<ProductFormErrors>({});
+
   const [isLoading, setIsLoading] = useState(true);
-
-  // Disables the create/update form while the request is pending.
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Indicates which product is currently being deleted.
   const [deletingProductId, setDeletingProductId] = useState<number | null>(
     null,
   );
 
-  // Form state used for both create and edit operations.
-  const [formData, setFormData] = useState<CreateProductRequest>({
-    name: "",
-    sku: "",
-    category: "",
-    price: 0,
-  });
+  const isEditing = editingProductId !== null;
+  const isOperationPending = isSubmitting || deletingProductId !== null;
 
   /**
    * Loads product records from the backend API.
-   *
-   * When manually refreshed after another operation, the function can
-   * suppress duplicate error notifications and allow the calling action
-   * to control the user-feedback flow.
    */
   const loadProducts = async (
     showErrorNotification = true,
@@ -71,59 +79,111 @@ const ProductsPage = () => {
     }
   };
 
-  const handleEditClick = (product: Product) => {
-    // Populate the form with the selected product so the user can update it.
-    setFormData({
-      name: product.name,
-      sku: product.sku,
-      category: product.category,
-      price: product.price,
-    });
-
-    setEditingProductId(product.id);
-  };
-
-  // Load products once when the component mounts.
   useEffect(() => {
     loadProducts();
   }, []);
 
   /**
-   * Creates a new product or updates an existing product.
-   *
-   * The form remains disabled while the request is running to prevent
-   * accidental duplicate submissions.
+   * Resets the form to its initial create-product state.
    */
-  const handleProductSubmit = async (
-    event: React.FormEvent<HTMLFormElement>,
-  ) => {
+  const resetForm = () => {
+    setFormData(emptyFormValues);
+    setFormErrors({});
+    setEditingProductId(null);
+  };
+
+  /**
+   * Updates a form value and removes its existing validation error.
+   */
+  const handleInputChange =
+    (field: keyof ProductFormValues) =>
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const value = event.target.value;
+
+      setFormData((current) => ({
+        ...current,
+        [field]: value,
+      }));
+
+      setFormErrors((current) => {
+        if (!current[field]) {
+          return current;
+        }
+
+        const updatedErrors = { ...current };
+        delete updatedErrors[field];
+
+        return updatedErrors;
+      });
+    };
+
+  /**
+   * Populates the form with an existing product for editing.
+   */
+  const handleEditClick = (product: Product) => {
+    setFormData({
+      name: product.name,
+      sku: product.sku,
+      category: product.category,
+      price: String(product.price),
+    });
+
+    setFormErrors({});
+    setEditingProductId(product.id);
+
+    document.getElementById("product-form")?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  };
+
+  /**
+   * Creates a new product or updates an existing product.
+   */
+  const handleProductSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (isSubmitting || deletingProductId !== null) {
+    if (isOperationPending) {
       return;
     }
 
-    const isEditing = editingProductId !== null;
+    const validationErrors = validateProductForm(formData);
+
+    if (Object.keys(validationErrors).length > 0) {
+      setFormErrors(validationErrors);
+
+      const firstInvalidField = Object.keys(validationErrors)[0] as
+        | keyof ProductFormValues
+        | undefined;
+
+      if (firstInvalidField) {
+        document
+          .getElementById(`product-${String(firstInvalidField)}`)
+          ?.focus();
+      }
+
+      return;
+    }
+
+    const payload: CreateProductRequest = {
+      name: formData.name.trim(),
+      sku: formData.sku.trim(),
+      category: formData.category.trim(),
+      price: Number(formData.price),
+    };
 
     setIsSubmitting(true);
 
     try {
-      if (isEditing) {
-        await updateProduct(editingProductId, formData);
+      if (editingProductId !== null) {
+        await updateProduct(editingProductId, payload);
       } else {
-        await createProduct(formData);
+        await createProduct(payload);
       }
 
       const productsRefreshed = await loadProducts(false);
 
-      setFormData({
-        name: "",
-        sku: "",
-        category: "",
-        price: 0,
-      });
-
-      setEditingProductId(null);
+      resetForm();
 
       if (productsRefreshed) {
         toast.success(
@@ -157,21 +217,29 @@ const ProductsPage = () => {
   /**
    * Deletes a product after receiving confirmation from the user.
    */
-  const handleDeleteProduct = async (productId: number) => {
-    if (deletingProductId !== null || isSubmitting) {
+  const handleDeleteProduct = async (product: Product) => {
+    if (isOperationPending) {
       return;
     }
 
-    if (!window.confirm("Delete this product? This action cannot be undone.")) {
+    const confirmed = window.confirm(
+      `Delete "${product.name}"? This action cannot be undone.`,
+    );
+
+    if (!confirmed) {
       return;
     }
 
-    setDeletingProductId(productId);
+    setDeletingProductId(product.id);
 
     try {
-      await deleteProduct(productId);
+      await deleteProduct(product.id);
 
       const productsRefreshed = await loadProducts(false);
+
+      if (editingProductId === product.id) {
+        resetForm();
+      }
 
       if (productsRefreshed) {
         toast.success("Product deleted successfully.");
@@ -196,157 +264,262 @@ const ProductsPage = () => {
 
   return (
     <DashboardLayout>
-      <div>
-        <h1 className="text-3xl font-bold text-white">Products</h1>
+      <div className="space-y-8">
+        <PageHeader
+          title="Products"
+          description="Create, update and manage inventory products."
+        />
 
-        <p className="mt-2 text-slate-400">Manage inventory products.</p>
+        <Card>
+          <CardHeader>
+            <CardTitle>{isEditing ? "Edit product" : "Add product"}</CardTitle>
 
-        {/* Create product form */}
-        <form
-          onSubmit={handleProductSubmit}
-          className="mt-8 grid grid-cols-1 gap-4 rounded-xl border border-slate-800 bg-slate-900 p-6 md:grid-cols-4"
-        >
-          <input
-            type="text"
-            placeholder="Product name"
-            value={formData.name}
-            onChange={(event) =>
-              setFormData({ ...formData, name: event.target.value })
-            }
-            className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white outline-none focus:border-cyan-500"
-            required
-          />
+            <p className="mt-1 text-sm text-muted-foreground">
+              {isEditing
+                ? "Update the selected product details below."
+                : "Enter the details required to add a product to the catalogue."}
+            </p>
+          </CardHeader>
 
-          <input
-            type="text"
-            placeholder="SKU"
-            value={formData.sku}
-            onChange={(event) =>
-              setFormData({ ...formData, sku: event.target.value })
-            }
-            className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white outline-none focus:border-cyan-500"
-            required
-          />
-
-          <input
-            type="text"
-            placeholder="Category"
-            value={formData.category}
-            onChange={(event) =>
-              setFormData({ ...formData, category: event.target.value })
-            }
-            className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white outline-none focus:border-cyan-500"
-            required
-          />
-
-          <input
-            type="number"
-            placeholder="Price"
-            value={formData.price}
-            onChange={(event) =>
-              setFormData({
-                ...formData,
-                price: Number(event.target.value),
-              })
-            }
-            className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white outline-none focus:border-cyan-500"
-            min="0"
-            step="0.01"
-            required
-          />
-
-          <button
-            type="submit"
-            disabled={isSubmitting || deletingProductId !== null}
-            className="rounded-lg bg-cyan-500 px-4 py-3 font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-60 md:col-span-4"
-          >
-            {isSubmitting
-               ? editingProductId !== null
-                ? "Updating Product..."
-                : "Creating Product..."
-              : editingProductId !== null
-                ? "Update Product"
-                : "Add Product"}
-          </button>
-        </form>
-
-        {/* Products table container */}
-        <div className="mt-8 rounded-xl border border-slate-800 bg-slate-900">
-          <div className="border-b border-slate-800 px-6 py-4">
-            <h2 className="text-lg font-semibold text-white">Product List</h2>
-          </div>
-
-          {isLoading ? (
-            <div
-              className="flex items-center gap-3 p-6 text-slate-400"
-              role="status"
-              aria-live="polite"
+          <CardContent>
+            <form
+              id="product-form"
+              onSubmit={handleProductSubmit}
+              noValidate
+              className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4"
             >
-              <span
-                className="h-5 w-5 animate-spin rounded-full border-2 border-slate-600 border-t-cyan-400"
-                aria-hidden="true"
-              />
-              <span>Loading products...</span>
-            </div>
-          ) : products.length === 0 ? (
-            <div className="p-8 text-center">
-              <h3 className="font-semibold text-white">
-                No products available
-              </h3>
-              <p className="mt-2 text-sm text-slate-400">
-                Add your first product using the form above.
+              <FormField
+                id="product-name"
+                label="Product name"
+                error={formErrors.name}
+                required
+              >
+                <Input
+                  id="product-name"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleInputChange("name")}
+                  placeholder="Example: Wireless keyboard"
+                  autoComplete="off"
+                  disabled={isOperationPending}
+                  required
+                  aria-invalid={Boolean(formErrors.name)}
+                  aria-describedby={
+                    formErrors.name ? "product-name-error" : undefined
+                  }
+                />
+              </FormField>
+
+              <FormField
+                id="product-sku"
+                label="SKU"
+                error={formErrors.sku}
+                required
+              >
+                <Input
+                  id="product-sku"
+                  name="sku"
+                  value={formData.sku}
+                  onChange={handleInputChange("sku")}
+                  placeholder="Example: KB-1001"
+                  autoComplete="off"
+                  disabled={isOperationPending}
+                  required
+                  aria-invalid={Boolean(formErrors.sku)}
+                  aria-describedby={
+                    formErrors.sku ? "product-sku-error" : undefined
+                  }
+                />
+              </FormField>
+
+              <FormField
+                id="product-category"
+                label="Category"
+                error={formErrors.category}
+                required
+              >
+                <Input
+                  id="product-category"
+                  name="category"
+                  value={formData.category}
+                  onChange={handleInputChange("category")}
+                  placeholder="Example: Accessories"
+                  autoComplete="off"
+                  disabled={isOperationPending}
+                  required
+                  aria-invalid={Boolean(formErrors.category)}
+                  aria-describedby={
+                    formErrors.category ? "product-category-error" : undefined
+                  }
+                />
+              </FormField>
+
+              <FormField
+                id="product-price"
+                label="Price"
+                error={formErrors.price}
+                hint="Enter the unit price in pounds sterling."
+                required
+              >
+                <Input
+                  id="product-price"
+                  name="price"
+                  type="number"
+                  inputMode="decimal"
+                  value={formData.price}
+                  onChange={handleInputChange("price")}
+                  placeholder="0.00"
+                  min="0"
+                  step="0.01"
+                  disabled={isOperationPending}
+                  required
+                  aria-invalid={Boolean(formErrors.price)}
+                  aria-describedby={
+                    formErrors.price
+                      ? "product-price-error"
+                      : "product-price-hint"
+                  }
+                />
+              </FormField>
+
+              <div className="flex flex-col gap-3 md:col-span-2 sm:flex-row xl:col-span-4">
+                <Button
+                  type="submit"
+                  size="lg"
+                  className="h-11 px-5"
+                  disabled={isOperationPending}
+                >
+                  {isSubmitting
+                    ? isEditing
+                      ? "Updating product..."
+                      : "Creating product..."
+                    : isEditing
+                      ? "Update product"
+                      : "Add product"}
+                </Button>
+
+                {isEditing && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="lg"
+                    className="h-11 px-5"
+                    onClick={resetForm}
+                    disabled={isOperationPending}
+                  >
+                    Cancel editing
+                  </Button>
+                )}
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-4">
+            <div>
+              <CardTitle>Product list</CardTitle>
+
+              <p className="mt-1 text-sm text-muted-foreground">
+                {products.length === 1
+                  ? "1 product"
+                  : `${products.length} products`}
               </p>
             </div>
-          ) : (
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-950 text-slate-400">
-                <tr>
-                  <th className="px-6 py-3">Name</th>
-                  <th className="px-6 py-3">SKU</th>
-                  <th className="px-6 py-3">Category</th>
-                  <th className="px-6 py-3">Price</th>
-                  <th className="px-6 py-3">Actions</th>
-                </tr>
-              </thead>
+          </CardHeader>
 
-              <tbody>
-                {products.map((product) => (
-                  <tr key={product.id} className="border-t border-slate-800">
-                    <td className="px-6 py-4 text-white">{product.name}</td>
-                    <td className="px-6 py-4 text-slate-300">{product.sku}</td>
-                    <td className="px-6 py-4 text-slate-300">
-                      {product.category}
-                    </td>
-                    <td className="px-6 py-4 text-slate-300">
-                      £{product.price.toFixed(2)}
-                    </td>
-                    {/* Edit and delete actions for each product row */}
-                    <td className="flex gap-2 px-6 py-4">
-                      <button
-                        type="button"
-                        onClick={() => handleEditClick(product)}
-                        disabled={isSubmitting || deletingProductId !== null}
-                        className="rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-slate-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteProduct(product.id)}
-                        disabled={deletingProductId !== null || isSubmitting}
-                        className="rounded-lg bg-rose-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-400 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {deletingProductId === product.id
-                          ? "Deleting..."
-                          : "Delete"}
-                      </button>
-                    </td>
+          {isLoading ? (
+            <LoadingState message="Loading products..." />
+          ) : products.length === 0 ? (
+            <EmptyState
+              title="No products available"
+              description="Add your first product using the form above."
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-190 text-left text-sm">
+                <caption className="sr-only">Inventory products</caption>
+
+                <thead className="bg-muted/40 text-muted-foreground">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 font-medium">
+                      Name
+                    </th>
+
+                    <th scope="col" className="px-6 py-3 font-medium">
+                      SKU
+                    </th>
+
+                    <th scope="col" className="px-6 py-3 font-medium">
+                      Category
+                    </th>
+
+                    <th scope="col" className="px-6 py-3 font-medium">
+                      Price
+                    </th>
+
+                    <th scope="col" className="px-6 py-3 font-medium">
+                      Actions
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+
+                <tbody>
+                  {products.map((product) => (
+                    <tr
+                      key={product.id}
+                      className="border-t border-border transition hover:bg-muted/20"
+                    >
+                      <td className="px-6 py-4 font-medium text-foreground">
+                        {product.name}
+                      </td>
+
+                      <td className="px-6 py-4 text-muted-foreground">
+                        {product.sku}
+                      </td>
+
+                      <td className="px-6 py-4 text-muted-foreground">
+                        {product.category}
+                      </td>
+
+                      <td className="px-6 py-4 text-muted-foreground">
+                        £{product.price.toFixed(2)}
+                      </td>
+
+                      <td className="px-6 py-4">
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => handleEditClick(product)}
+                            disabled={isOperationPending}
+                            aria-label={`Edit ${product.name}`}
+                          >
+                            Edit
+                          </Button>
+
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleDeleteProduct(product)}
+                            disabled={isOperationPending}
+                            aria-label={`Delete ${product.name}`}
+                          >
+                            {deletingProductId === product.id
+                              ? "Deleting..."
+                              : "Delete"}
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
-        </div>
+        </Card>
       </div>
     </DashboardLayout>
   );
