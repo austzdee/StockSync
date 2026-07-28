@@ -13,7 +13,7 @@ import { Outlet } from "react-router-dom";
  */
 const PublicLayout = () => {
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
+    <div className="dark min-h-screen bg-background text-foreground">
       {/* Shared public navigation can be rendered here when required. */}
       {/* <LandingNavbar /> */}
 
