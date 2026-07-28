@@ -1,21 +1,11 @@
-import {
-  useEffect,
-  useState,
-  type ChangeEvent,
-  type FormEvent,
-} from "react";
+import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import { toast } from "sonner";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import LoadingState from "@/components/feedback/LoadingState";
 import PageHeader from "@/components/shared/PageHeader";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { getApiErrorMessage } from "@/lib/getApiErrorMessage";
@@ -42,24 +32,24 @@ const emptyFormValues: WarehouseFormValues = {
 const WarehousesPage = () => {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
 
-  const [editingWarehouseId, setEditingWarehouseId] =
-    useState<number | null>(null);
+  const [editingWarehouseId, setEditingWarehouseId] = useState<number | null>(
+    null,
+  );
 
   const [formData, setFormData] =
     useState<WarehouseFormValues>(emptyFormValues);
 
-  const [formErrors, setFormErrors] =
-    useState<WarehouseFormErrors>({});
+  const [formErrors, setFormErrors] = useState<WarehouseFormErrors>({});
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [deletingWarehouseId, setDeletingWarehouseId] =
-    useState<number | null>(null);
+  const [deletingWarehouseId, setDeletingWarehouseId] = useState<number | null>(
+    null,
+  );
 
   const isEditing = editingWarehouseId !== null;
-  const isOperationPending =
-    isSubmitting || deletingWarehouseId !== null;
+  const isOperationPending = isSubmitting || deletingWarehouseId !== null;
 
   /**
    * Loads warehouse records from the backend API.
@@ -72,7 +62,25 @@ const WarehousesPage = () => {
     try {
       const data = await getWarehouses();
 
-      setWarehouses(data);
+      const sortedWarehouses = [...data].sort((first, second) => {
+        const locationComparison = first.locationName.localeCompare(
+          second.locationName,
+          "en-GB",
+          {
+            sensitivity: "base",
+          },
+        );
+
+        if (locationComparison !== 0) {
+          return locationComparison;
+        }
+
+        return first.address.localeCompare(second.address, "en-GB", {
+          sensitivity: "base",
+        });
+      });
+
+      setWarehouses(sortedWarehouses);
 
       return true;
     } catch (error) {
@@ -152,9 +160,7 @@ const WarehousesPage = () => {
   /**
    * Creates a warehouse or updates the selected warehouse.
    */
-  const handleSaveWarehouse = async (
-    event: FormEvent<HTMLFormElement>,
-  ) => {
+  const handleSaveWarehouse = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (isOperationPending) {
@@ -166,15 +172,13 @@ const WarehousesPage = () => {
     if (Object.keys(validationErrors).length > 0) {
       setFormErrors(validationErrors);
 
-      const firstInvalidField = Object.keys(
-        validationErrors,
-      )[0] as keyof WarehouseFormValues | undefined;
+      const firstInvalidField = Object.keys(validationErrors)[0] as
+        | keyof WarehouseFormValues
+        | undefined;
 
       if (firstInvalidField) {
         document
-          .getElementById(
-            `warehouse-${String(firstInvalidField)}`,
-          )
+          .getElementById(`warehouse-${String(firstInvalidField)}`)
           ?.focus();
       }
 
@@ -195,8 +199,7 @@ const WarehousesPage = () => {
         await createWarehouse(payload);
       }
 
-      const warehousesRefreshed =
-        await loadWarehouses(false);
+      const warehousesRefreshed = await loadWarehouses(false);
 
       resetForm();
 
@@ -232,9 +235,7 @@ const WarehousesPage = () => {
   /**
    * Deletes a warehouse after user confirmation.
    */
-  const handleDeleteWarehouse = async (
-    warehouse: Warehouse,
-  ) => {
+  const handleDeleteWarehouse = async (warehouse: Warehouse) => {
     if (isOperationPending) {
       return;
     }
@@ -252,8 +253,7 @@ const WarehousesPage = () => {
     try {
       await deleteWarehouse(warehouse.id);
 
-      const warehousesRefreshed =
-        await loadWarehouses(false);
+      const warehousesRefreshed = await loadWarehouses(false);
 
       if (editingWarehouseId === warehouse.id) {
         resetForm();
@@ -325,9 +325,7 @@ const WarehousesPage = () => {
                   maxLength={100}
                   disabled={isOperationPending}
                   required
-                  aria-invalid={Boolean(
-                    formErrors.locationName,
-                  )}
+                  aria-invalid={Boolean(formErrors.locationName)}
                   aria-describedby={
                     formErrors.locationName
                       ? "warehouse-locationName-error"
@@ -418,30 +416,19 @@ const WarehousesPage = () => {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-160 text-left text-sm">
-                <caption className="sr-only">
-                  Warehouse locations
-                </caption>
+                <caption className="sr-only">Warehouse locations</caption>
 
                 <thead className="bg-muted/40 text-muted-foreground">
                   <tr>
-                    <th
-                      scope="col"
-                      className="px-6 py-3 font-medium"
-                    >
+                    <th scope="col" className="px-6 py-3 font-medium">
                       Location
                     </th>
 
-                    <th
-                      scope="col"
-                      className="px-6 py-3 font-medium"
-                    >
+                    <th scope="col" className="px-6 py-3 font-medium">
                       Address
                     </th>
 
-                    <th
-                      scope="col"
-                      className="px-6 py-3 font-medium"
-                    >
+                    <th scope="col" className="px-6 py-3 font-medium">
                       Actions
                     </th>
                   </tr>
@@ -467,9 +454,7 @@ const WarehousesPage = () => {
                             type="button"
                             variant="secondary"
                             size="sm"
-                            onClick={() =>
-                              handleEditWarehouse(warehouse)
-                            }
+                            onClick={() => handleEditWarehouse(warehouse)}
                             disabled={isOperationPending}
                             aria-label={`Edit ${warehouse.locationName}`}
                           >
@@ -480,9 +465,7 @@ const WarehousesPage = () => {
                             type="button"
                             variant="destructive"
                             size="sm"
-                            onClick={() =>
-                              handleDeleteWarehouse(warehouse)
-                            }
+                            onClick={() => handleDeleteWarehouse(warehouse)}
                             disabled={isOperationPending}
                             aria-label={`Delete ${warehouse.locationName}`}
                           >
