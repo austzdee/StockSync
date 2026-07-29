@@ -1,5 +1,5 @@
 import stockSyncLogo from "../assets/stocksync-logo.png";
-import { NavLink } from "react-router-dom";
+import { NavLink } from "react-router";
 
 interface SidebarProps {
   mobileSidebarOpen: boolean;

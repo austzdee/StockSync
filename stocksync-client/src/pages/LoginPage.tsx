@@ -9,7 +9,7 @@ import {
   LoaderCircle,
   ShieldCheck,
 } from "lucide-react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/useAuth";
 import { login as loginUser } from "@/services/authService";
