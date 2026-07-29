@@ -51,7 +51,7 @@ jobs:
         run: dotnet test StockSync.slnx --configuration Release --no-build
 
   frontend:
-    name: Frontend Build
+    name: Frontend Quality Gates
     runs-on: ubuntu-latest
 
     defaults:
@@ -69,9 +69,19 @@ jobs:
           cache: "npm"
           cache-dependency-path: stocksync-client/package-lock.json
 
+      # Uses the committed lock file to provide reproducible CI installs.
       - name: Install frontend dependencies
         run: npm ci
 
+      # Prevents authentication, routing and component regressions.
+      - name: Run frontend tests
+        run: npm test
+
+      # Enforces the repository's TypeScript and React lint rules.
+      - name: Lint frontend
+        run: npm run lint
+
+      # Confirms that TypeScript compilation and the production bundle succeed.
       - name: Build frontend
         run: npm run build
 
