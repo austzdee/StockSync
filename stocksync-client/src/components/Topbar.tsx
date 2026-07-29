@@ -1,13 +1,26 @@
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+
 import { useAuth } from "../contexts/useAuth";
 
 interface TopbarProps {
   onOpenMobileSidebar: () => void;
 }
 
+const routeTitles: Record<string, string> = {
+  "/dashboard": "Dashboard",
+  "/products": "Products",
+  "/warehouses": "Warehouses",
+  "/stock-transfers": "Stock Operations",
+  "/audit-logs": "Audit Logs",
+  "/reports": "Reports",
+};
+
 const Topbar = ({ onOpenMobileSidebar }: TopbarProps) => {
+  const location = useLocation();
   const navigate = useNavigate();
   const { logout } = useAuth();
+
+  const pageTitle = routeTitles[location.pathname] ?? "StockSync";
 
   const handleLogout = () => {
     logout();
@@ -26,7 +39,7 @@ const Topbar = ({ onOpenMobileSidebar }: TopbarProps) => {
           ☰
         </button>
 
-        <h2 className="text-lg font-semibold text-white">Dashboard</h2>
+        <h1 className="text-lg font-semibold text-white">{pageTitle}</h1>
       </div>
 
       <button
