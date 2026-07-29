@@ -1,12 +1,15 @@
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
+
+import {
+  AuthContext,
+  type AuthContextValue,
+} from "@/contexts/auth-context";
 
 /* ============================================================
    Authentication Configuration
@@ -19,16 +22,7 @@ const SESSION_EXPIRED_EVENT = "stocksync:session-expired";
    Types
 ============================================================ */
 
-/**
- * Defines the authentication state and actions available
- * throughout the frontend application.
- */
-interface AuthContextValue {
-  token: string | null;
-  isAuthenticated: boolean;
-  login: (token: string, rememberMe?: boolean) => void;
-  logout: () => void;
-}
+
 
 /**
  * Defines the properties accepted by the authentication provider.
@@ -37,11 +31,6 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
-/* ============================================================
-   Context
-============================================================ */
-
-const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 /* ============================================================
    Storage Helpers
@@ -160,23 +149,4 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       {children}
     </AuthContext.Provider>
   );
-};
-
-/* ============================================================
-   Hook
-============================================================ */
-
-/**
- * Provides safe access to the authentication context.
- *
- * @throws Error when used outside the AuthProvider.
- */
-export const useAuth = (): AuthContextValue => {
-  const context = useContext(AuthContext);
-
-  if (!context) {
-    throw new Error("useAuth must be used inside AuthProvider");
-  }
-
-  return context;
 };

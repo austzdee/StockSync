@@ -221,8 +221,105 @@ const StockTransfersPage = () => {
   };
 
   useEffect(() => {
-    loadStockPageData();
-  }, []);
+    let isActive = true;
+
+    const loadInitialStockPageData = async (): Promise<void> => {
+      try {
+        const [productData, warehouseData, stockData] = await Promise.all([
+          getProducts(),
+          getWarehouses(),
+          getStock(),
+        ]);
+
+        const sortedProducts = [...productData].sort((first, second) => {
+          const nameComparison = first.name.localeCompare(
+            second.name,
+            "en-GB",
+            {
+              sensitivity: "base",
+            },
+          );
+
+          if (nameComparison !== 0) {
+            return nameComparison;
+          }
+
+          return first.sku.localeCompare(second.sku, "en-GB", {
+            sensitivity: "base",
+          });
+        });
+
+        const sortedWarehouses = [...warehouseData].sort((first, second) => {
+          const locationComparison = first.locationName.localeCompare(
+            second.locationName,
+            "en-GB",
+            {
+              sensitivity: "base",
+            },
+          );
+
+          if (locationComparison !== 0) {
+            return locationComparison;
+          }
+
+          return first.address.localeCompare(second.address, "en-GB", {
+            sensitivity: "base",
+          });
+        });
+
+        const sortedStockItems = [...stockData.results].sort(
+          (first, second) => {
+            const productComparison = first.productName.localeCompare(
+              second.productName,
+              "en-GB",
+              {
+                sensitivity: "base",
+              },
+            );
+
+            if (productComparison !== 0) {
+              return productComparison;
+            }
+
+            return first.warehouseName.localeCompare(
+              second.warehouseName,
+              "en-GB",
+              {
+                sensitivity: "base",
+              },
+            );
+          },
+        );
+
+        if (isActive) {
+          setProducts(sortedProducts);
+          setWarehouses(sortedWarehouses);
+          setStockItems(sortedStockItems);
+        }
+      } catch (error) {
+        console.error("Failed to load stock page data", error);
+
+        if (isActive) {
+          toast.error(
+            getApiErrorMessage(
+              error,
+              "Unable to load stock operations data. Please try again.",
+            ),
+          );
+        }
+      } finally {
+        if (isActive) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void loadInitialStockPageData();
+
+    return () => {
+      isActive = false;
+    };
+  }, [])
 
   /**
    * Starts one stock mutation and blocks concurrent submissions.

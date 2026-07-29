@@ -1,3 +1,5 @@
+import { Card, CardContent } from "@/components/ui/card";
+
 interface DashboardCardProps {
   title: string;
   value: string | number;
@@ -5,9 +7,15 @@ interface DashboardCardProps {
   tone?: "default" | "success" | "warning" | "danger";
 }
 
+const toneClasses = {
+  default: "text-foreground",
+  success: "text-success",
+  warning: "text-warning",
+  danger: "text-destructive",
+};
+
 /**
- * Reusable metric card used across the dashboard.
- * Keeps dashboard statistics consistent and easy to maintain.
+ * Displays one inventory metric using the shared card system.
  */
 const DashboardCard = ({
   title,
@@ -15,21 +23,27 @@ const DashboardCard = ({
   description,
   tone = "default",
 }: DashboardCardProps) => {
-  const valueColor = {
-    default: "text-white",
-    success: "text-green-400",
-    warning: "text-amber-400",
-    danger: "text-red-400",
-  }[tone];
+  const formattedValue =
+    typeof value === "number" ? value.toLocaleString("en-GB") : value;
 
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900 p-6 shadow-sm">
-      <p className="text-sm text-slate-400">{title}</p>
+    <Card>
+      <CardContent className="p-6">
+        <h2 className="text-sm font-medium text-muted-foreground">
+          {title}
+        </h2>
 
-      <p className={`mt-3 text-3xl font-bold ${valueColor}`}>{value}</p>
+        <p
+          className={`mt-3 text-3xl font-bold tracking-tight ${toneClasses[tone]}`}
+        >
+          {formattedValue}
+        </p>
 
-      <p className="mt-2 text-sm text-slate-500">{description}</p>
-    </div>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {description}
+        </p>
+      </CardContent>
+    </Card>
   );
 };
 
