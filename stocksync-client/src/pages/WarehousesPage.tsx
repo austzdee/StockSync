@@ -102,7 +102,56 @@ const WarehousesPage = () => {
   };
 
   useEffect(() => {
-    loadWarehouses();
+    let isActive = true;
+
+    const loadInitialWarehouses = async (): Promise<void> => {
+      try {
+        const data = await getWarehouses();
+
+        const sortedWarehouses = [...data].sort((first, second) => {
+          const locationComparison = first.locationName.localeCompare(
+            second.locationName,
+            "en-GB",
+            {
+              sensitivity: "base",
+            },
+          );
+
+          if (locationComparison !== 0) {
+            return locationComparison;
+          }
+
+          return first.address.localeCompare(second.address, "en-GB", {
+            sensitivity: "base",
+          });
+        });
+
+        if (isActive) {
+          setWarehouses(sortedWarehouses);
+        }
+      } catch (error) {
+        console.error("Failed to load warehouses", error);
+
+        if (isActive) {
+          toast.error(
+            getApiErrorMessage(
+              error,
+              "Unable to load warehouses. Please try again.",
+            ),
+          );
+        }
+      } finally {
+        if (isActive) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void loadInitialWarehouses();
+
+    return () => {
+      isActive = false;
+    };
   }, []);
 
   /**

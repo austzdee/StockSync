@@ -80,7 +80,38 @@ const ProductsPage = () => {
   };
 
   useEffect(() => {
-    loadProducts();
+    let isActive = true;
+
+    const loadInitialProducts = async (): Promise<void> => {
+      try {
+        const data = await getProducts();
+
+        if (isActive) {
+          setProducts(data);
+        }
+      } catch (error) {
+        console.error("Failed to load products", error);
+
+        if (isActive) {
+          toast.error(
+            getApiErrorMessage(
+              error,
+              "Unable to load products. Please try again.",
+            ),
+          );
+        }
+      } finally {
+        if (isActive) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void loadInitialProducts();
+
+    return () => {
+      isActive = false;
+    };
   }, []);
 
   /**
