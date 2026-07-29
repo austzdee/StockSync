@@ -4,7 +4,7 @@ import {
   Navigate,
   Route,
   Routes,
-} from "react-router-dom";
+} from "react-router";
 
 import PublicLayout from "./layouts/PublicLayout";
 import ProtectedRoute from "./routes/ProtectedRoute";

@@ -5,7 +5,7 @@ import {
   Building2,
   ShieldCheck,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import TrustSection from "@/components/landing/TrustSection";
 import WorkflowSection from "@/components/landing/WorkflowSection";
