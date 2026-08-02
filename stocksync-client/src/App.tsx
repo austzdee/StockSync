@@ -1,13 +1,9 @@
 import { lazy, Suspense, type ReactNode } from "react";
-import {
-  BrowserRouter,
-  Navigate,
-  Route,
-  Routes,
-} from "react-router";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 
 import PublicLayout from "./layouts/PublicLayout";
 import ProtectedRoute from "./routes/ProtectedRoute";
+import AdminRoute from "./routes/AdminRoute";
 
 /**
  * Loads page components only when their matching route is visited.
@@ -21,13 +17,9 @@ const LandingPage = lazy(() => import("./pages/LandingPage"));
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const ProductsPage = lazy(() => import("./pages/ProductsPage"));
 const ReportsPage = lazy(() => import("./pages/ReportsPage"));
-const StockTransfersPage = lazy(
-  () => import("./pages/StockTransfersPage"),
-);
-const WarehousesPage = lazy(
-  () => import("./pages/WarehousesPage"),
-);
-
+const StockTransfersPage = lazy(() => import("./pages/StockTransfersPage"));
+const WarehousesPage = lazy(() => import("./pages/WarehousesPage"));
+const UsersPage = lazy(() => import("./pages/UsersPage"));
 /**
  * Provides accessible feedback while a lazy-loaded route bundle
  * is being downloaded and evaluated.
@@ -68,15 +60,9 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
 
           {/* Protected inventory-management routes */}
-          <Route
-            path="/dashboard"
-            element={protectedPage(<DashboardPage />)}
-          />
+          <Route path="/dashboard" element={protectedPage(<DashboardPage />)} />
 
-          <Route
-            path="/products"
-            element={protectedPage(<ProductsPage />)}
-          />
+          <Route path="/products" element={protectedPage(<ProductsPage />)} />
 
           <Route
             path="/warehouses"
@@ -88,14 +74,20 @@ function App() {
             element={protectedPage(<StockTransfersPage />)}
           />
 
-          <Route
-            path="/reports"
-            element={protectedPage(<ReportsPage />)}
-          />
+          <Route path="/reports" element={protectedPage(<ReportsPage />)} />
 
           <Route
             path="/audit-logs"
             element={protectedPage(<AuditLogsPage />)}
+          />
+
+          <Route
+            path="/users"
+            element={protectedPage(
+              <AdminRoute>
+                <UsersPage />
+              </AdminRoute>,
+            )}
           />
 
           {/* Unknown public URLs return visitors to the landing page */}

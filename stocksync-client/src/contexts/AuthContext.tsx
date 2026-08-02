@@ -8,6 +8,7 @@ import {
 
 import {
   AuthContext,
+  type AuthenticatedUser,
   type AuthContextValue,
 } from "@/contexts/auth-context";
 
@@ -16,13 +17,12 @@ import {
 ============================================================ */
 
 const AUTH_TOKEN_KEY = "stocksync_auth_token";
+const AUTH_USER_KEY = "stocksync_authenticated_user";
 const SESSION_EXPIRED_EVENT = "stocksync:session-expired";
 
 /* ============================================================
    Types
 ============================================================ */
-
-
 
 /**
  * Defines the properties accepted by the authentication provider.
@@ -31,16 +31,13 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
-
 /* ============================================================
    Storage Helpers
 ============================================================ */
 
 /**
- * Retrieves the currently stored authentication token.
- *
- * Persistent sessions use localStorage, while temporary browser
- * sessions use sessionStorage.
+ * Retrieves the current authentication token from persistent
+ * or session-based browser storage.
  */
 const getStoredToken = (): string | null => {
   return (
@@ -50,12 +47,40 @@ const getStoredToken = (): string | null => {
 };
 
 /**
+ * Retrieves and parses the authenticated user stored
+ * alongside the current access token.
+ *
+ * Invalid stored JSON is removed to prevent the application
+ * from loading corrupted authentication state.
+ */
+const getStoredUser = (): AuthenticatedUser | null => {
+  const storedUser =
+    localStorage.getItem(AUTH_USER_KEY) ??
+    sessionStorage.getItem(AUTH_USER_KEY);
+
+  if (!storedUser) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(storedUser) as AuthenticatedUser;
+  } catch {
+    localStorage.removeItem(AUTH_USER_KEY);
+    sessionStorage.removeItem(AUTH_USER_KEY);
+
+    return null;
+  }
+};
+
+/**
  * Removes authentication information from every supported
  * browser storage location.
  */
-const clearStoredToken = (): void => {
+const clearStoredSession = (): void => {
   localStorage.removeItem(AUTH_TOKEN_KEY);
+  localStorage.removeItem(AUTH_USER_KEY);
   sessionStorage.removeItem(AUTH_TOKEN_KEY);
+  sessionStorage.removeItem(AUTH_USER_KEY);
 };
 
 /* ============================================================
@@ -71,26 +96,36 @@ const clearStoredToken = (): void => {
  */
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [token, setToken] = useState<string | null>(getStoredToken);
+  const [user, setUser] = useState<AuthenticatedUser | null>(getStoredUser);
 
   /**
-   * Stores a newly issued JWT using the user's selected
-   * session persistence preference.
-   *
-   * @param newToken - JWT returned by the authentication API.
-   * @param rememberMe - Whether the session should survive
-   * browser restarts.
-   */
+ * Stores a newly issued JWT and authenticated user using the
+ * selected session persistence preference.
+ *
+ * @param newToken - JWT returned by the authentication API.
+ * @param authenticatedUser - User details returned by the authentication API.
+ * @param rememberMe - Whether the session should survive browser restarts.
+ */
   const login = useCallback(
-    (newToken: string, rememberMe = true): void => {
-      clearStoredToken();
+    (
+      newToken: string,
+      authenticatedUser: AuthenticatedUser,
+      rememberMe = true,
+    ): void => {
+      clearStoredSession();
+
+      const serializedUser = JSON.stringify(authenticatedUser);
 
       if (rememberMe) {
         localStorage.setItem(AUTH_TOKEN_KEY, newToken);
+        localStorage.setItem(AUTH_USER_KEY, serializedUser);
       } else {
         sessionStorage.setItem(AUTH_TOKEN_KEY, newToken);
+        sessionStorage.setItem(AUTH_USER_KEY, serializedUser);
       }
 
       setToken(newToken);
+      setUser(authenticatedUser);
     },
     [],
   );
@@ -100,8 +135,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
    * authentication state.
    */
   const logout = useCallback((): void => {
-    clearStoredToken();
+    clearStoredSession();
     setToken(null);
+    setUser(null);
   }, []);
 
   /**
@@ -117,16 +153,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       logout();
     };
 
-    window.addEventListener(
-      SESSION_EXPIRED_EVENT,
-      handleSessionExpired,
-    );
+    window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
 
     return () => {
-      window.removeEventListener(
-        SESSION_EXPIRED_EVENT,
-        handleSessionExpired,
-      );
+      window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
     };
   }, [logout]);
 
@@ -137,16 +167,14 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const value = useMemo<AuthContextValue>(
     () => ({
       token,
+      user,
       isAuthenticated: Boolean(token),
+      isAdmin: user?.role === "Admin",
       login,
       logout,
     }),
-    [token, login, logout],
+    [token, user, login, logout],
   );
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

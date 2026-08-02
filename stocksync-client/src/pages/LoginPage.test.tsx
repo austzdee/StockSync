@@ -1,19 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import {
-  MemoryRouter,
-  Route,
-  Routes,
-  useLocation,
-} from "react-router";
-import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import LoginPage from "./LoginPage";
 
@@ -117,6 +105,13 @@ const renderLoginPage = (
   );
 };
 
+const authenticatedUser = {
+  id: 1,
+  fullName: "Test Admin",
+  email: "test@example.com",
+  role: "Admin",
+};
+
 describe("LoginPage", () => {
   /**
    * Resets authentication mocks before each test so each
@@ -133,8 +128,12 @@ describe("LoginPage", () => {
     /**
      * Simulates a successful response from the authentication API.
      */
+
     mockLoginUser.mockResolvedValue({
+      message: "Login successful.",
       token: "test-token",
+      refreshToken: "test-refresh-token",
+      user: authenticatedUser,
     });
 
     renderLoginPage();
@@ -150,10 +149,7 @@ describe("LoginPage", () => {
       "  admin@stocksync.test  ",
     );
 
-    await user.type(
-      screen.getByLabelText("Password"),
-      "ValidPassword123!",
-    );
+    await user.type(screen.getByLabelText("Password"), "ValidPassword123!");
 
     await user.click(
       screen.getByRole("button", {
@@ -175,6 +171,7 @@ describe("LoginPage", () => {
      */
     expect(mockLoginContext).toHaveBeenCalledWith(
       "test-token",
+      authenticatedUser,
       true,
     );
 
@@ -197,7 +194,10 @@ describe("LoginPage", () => {
     const user = userEvent.setup();
 
     mockLoginUser.mockResolvedValue({
+      message: "Login successful.",
       token: "test-token",
+      refreshToken: "test-refresh-token",
+      user: authenticatedUser,
     });
 
     /**
@@ -221,10 +221,7 @@ describe("LoginPage", () => {
       "admin@stocksync.test",
     );
 
-    await user.type(
-      screen.getByLabelText("Password"),
-      "ValidPassword123!",
-    );
+    await user.type(screen.getByLabelText("Password"), "ValidPassword123!");
 
     await user.click(
       screen.getByRole("button", {
@@ -246,7 +243,10 @@ describe("LoginPage", () => {
     const user = userEvent.setup();
 
     mockLoginUser.mockResolvedValue({
+      message: "Login successful.",
       token: "test-token",
+      refreshToken: "test-refresh-token",
+      user: authenticatedUser,
     });
 
     renderLoginPage();
@@ -258,10 +258,7 @@ describe("LoginPage", () => {
       "admin@stocksync.test",
     );
 
-    await user.type(
-      screen.getByLabelText("Password"),
-      "ValidPassword123!",
-    );
+    await user.type(screen.getByLabelText("Password"), "ValidPassword123!");
 
     /**
      * Remember me begins enabled, so clicking it disables
@@ -281,6 +278,7 @@ describe("LoginPage", () => {
 
     expect(mockLoginContext).toHaveBeenCalledWith(
       "test-token",
+      authenticatedUser,
       false,
     );
   });
@@ -291,9 +289,7 @@ describe("LoginPage", () => {
     /**
      * Simulates rejected credentials from the authentication API.
      */
-    mockLoginUser.mockRejectedValue(
-      new Error("Invalid credentials"),
-    );
+    mockLoginUser.mockRejectedValue(new Error("Invalid credentials"));
 
     renderLoginPage();
 
@@ -304,10 +300,7 @@ describe("LoginPage", () => {
       "admin@stocksync.test",
     );
 
-    await user.type(
-      screen.getByLabelText("Password"),
-      "IncorrectPassword",
-    );
+    await user.type(screen.getByLabelText("Password"), "IncorrectPassword");
 
     await user.click(
       screen.getByRole("button", {
@@ -350,10 +343,7 @@ describe("LoginPage", () => {
     /**
      * Passwords must be concealed initially.
      */
-    expect(passwordInput).toHaveAttribute(
-      "type",
-      "password",
-    );
+    expect(passwordInput).toHaveAttribute("type", "password");
 
     await user.click(
       screen.getByRole("button", {
@@ -369,9 +359,6 @@ describe("LoginPage", () => {
       }),
     );
 
-    expect(passwordInput).toHaveAttribute(
-      "type",
-      "password",
-    );
+    expect(passwordInput).toHaveAttribute("type", "password");
   });
 });
