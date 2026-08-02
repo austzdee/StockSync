@@ -104,7 +104,7 @@ const redirectPath = routeState?.from
         password,
       });
 
-      login(response.token, rememberMe);
+      login(response.token, response.user, rememberMe);
       navigate(redirectPath, { replace: true });
     } catch (error: unknown) {
       console.error("Login failed", error);

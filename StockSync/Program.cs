@@ -12,8 +12,8 @@ using System.Text;
 using System.Threading.RateLimiting;
 
 
-
 var builder = WebApplication.CreateBuilder(args);
+
 builder.Services.AddHealthChecks();
 builder.Services.AddRateLimiter(options =>
 {
@@ -105,7 +105,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
     // Publishes the first stable StockSync API contract.
-    
+
     options.SwaggerDoc("v1", new OpenApiInfo
     {
         Title = "StockSync API",
@@ -146,6 +146,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddHealthChecks();
 
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IStockService, StockService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<IProductService, ProductService>();

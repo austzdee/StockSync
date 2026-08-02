@@ -1,3 +1,4 @@
+import { useAuth } from "@/contexts/useAuth";
 import stockSyncLogo from "../assets/stocksync-logo.png";
 import { NavLink } from "react-router";
 
@@ -8,21 +9,82 @@ interface SidebarProps {
   onToggleDesktopSidebar: () => void;
 }
 
-const navigationItems = [
-  { label: "Dashboard", shortLabel: "D", to: "/dashboard" },
-  { label: "Products", shortLabel: "P", to: "/products" },
-  { label: "Warehouses", shortLabel: "W", to: "/warehouses" },
-  { label: "Stock Operations", shortLabel: "S", to: "/stock-transfers" },
-  { label: "Audit Logs", shortLabel: "A", to: "/audit-logs" },
-  { label: "Reports", shortLabel: "R", to: "/reports" },
+/**
+ * Defines an item displayed in the sidebar navigation.
+ */
+interface NavigationItem {
+  label: string;
+  shortLabel: string;
+  to: string;
+  adminOnly?: boolean;
+}
+
+/**
+ * Defines all available sidebar navigation items.
+ *
+ * Items marked as admin-only are filtered out for users who
+ * do not have the administrator role.
+ */
+const navigationItems: NavigationItem[] = [
+  {
+    label: "Dashboard",
+    shortLabel: "D",
+    to: "/dashboard",
+  },
+  {
+    label: "Products",
+    shortLabel: "P",
+    to: "/products",
+  },
+  {
+    label: "Warehouses",
+    shortLabel: "W",
+    to: "/warehouses",
+  },
+  {
+    label: "Stock Operations",
+    shortLabel: "S",
+    to: "/stock-transfers",
+  },
+  {
+    label: "Audit Logs",
+    shortLabel: "A",
+    to: "/audit-logs",
+  },
+  {
+    label: "Reports",
+    shortLabel: "R",
+    to: "/reports",
+  },
+  {
+    label: "Users",
+    shortLabel: "U",
+    to: "/users",
+    adminOnly: true,
+  },
 ];
 
+/**
+ * Renders the responsive application sidebar.
+ *
+ * Administrator-only navigation links are displayed only when
+ * the authenticated user has the Admin role.
+ */
 const Sidebar = ({
   mobileSidebarOpen,
   desktopSidebarCollapsed,
   onCloseMobileSidebar,
   onToggleDesktopSidebar,
 }: SidebarProps) => {
+  const { isAdmin } = useAuth();
+
+  /**
+   * Removes administrator-only links for non-admin users.
+   */
+  const visibleNavigationItems = navigationItems.filter(
+    (item) => !item.adminOnly || isAdmin,
+  );
+
   return (
     <aside
       className={`fixed inset-y-0 left-0 z-50 border-r border-slate-800 bg-slate-950 transition-all duration-300
@@ -74,9 +136,12 @@ const Sidebar = ({
           </button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-3 py-4">
+        <nav
+          className="flex-1 overflow-y-auto px-3 py-4"
+          aria-label="Main navigation"
+        >
           <ul className="space-y-2">
-            {navigationItems.map((item) => (
+            {visibleNavigationItems.map((item) => (
               <li key={item.to}>
                 <NavLink
                   to={item.to}
@@ -94,7 +159,9 @@ const Sidebar = ({
                     }`
                   }
                 >
-                  {desktopSidebarCollapsed ? item.shortLabel : item.label}
+                  {desktopSidebarCollapsed
+                    ? item.shortLabel
+                    : item.label}
                 </NavLink>
               </li>
             ))}
